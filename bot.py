@@ -10,6 +10,7 @@ CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 GROQ_KEY = os.environ.get("GROQ_API_KEY")
 API = "https://api.telegram.org/bot" + TOKEN
 
+CHANNEL = "@cryptoainovosti"
 pending = {}
 settings = {"interval": 3600, "auto": False, "filters": []}
 chat_history = {}
@@ -100,8 +101,8 @@ def scan_and_consult(chat):
     )
 
 def publish(chat, post):
-    send(chat, "📢 <b>Агент 4 публикует:</b>\n\n" + post)
-    send(chat, "✅ Пост опубликован!")
+    send(CHANNEL, post)
+    send(chat, "✅ <b>Пост опубликован в канал</b> @cryptoainovosti!\n\n" + post)
 
 def assistant(chat, text):
     if chat not in chat_history:

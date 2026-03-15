@@ -5,6 +5,7 @@ import threading
 from datetime import datetime
 from bs4 import BeautifulSoup
 import urllib.parse
+import hashlib
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
@@ -13,8 +14,9 @@ API = "https://api.telegram.org/bot" + TOKEN
 CHANNEL = "@cryptoainovosti"
 
 pending = {}
-settings = {"auto": False}
+settings = {"auto_monitor": False}
 chat_history = {}
+seen_news = set()
 
 def send(chat, text, markup=None):
     data = {"chat_id": chat, "text": text, "parse_mode": "HTML"}
@@ -30,9 +32,10 @@ def send_photo(chat, photo_url, caption="", markup=None):
     if markup:
         data["reply_markup"] = markup
     try:
-        requests.post(API + "/sendPhoto", json=data, timeout=15)
+        r = requests.post(API + "/sendPhoto", json=data, timeout=15)
+        return r.json().get("ok", False)
     except:
-        pass
+        return False
 
 def ai(messages):
     try:
@@ -49,90 +52,149 @@ def ai(messages):
 def generate_image(prompt):
     try:
         encoded = urllib.parse.quote(prompt)
-        url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=512&nologo=true"
+        url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=512&nologo=true&seed={int(time.time())}"
         return url
     except:
         return None
 
-def get_image_prompt(news_list):
-    titles = " | ".join([n["title"] for n in news_list[:3]])
+def get_image_prompt(title):
     prompt = ai([
-        {"role": "system", "content": "Generate a short English image prompt (max 20 words) for a crypto news article illustration. Style: modern, digital, financial. No text in image."},
-        {"role": "user", "content": "News: " + titles}
+        {"role": "system", "content": "Generate a short English image prompt (max 15 words) for a crypto news illustration. Style: modern, digital, financial, dark background. No text."},
+        {"role": "user", "content": "News: " + title}
     ])
-    return prompt[:200]
+    return prompt[:150]
 
-def get_news():
+def write_post(title, source):
+    return ai([
+        {"role": "system", "content": "Ты крипто эксперт и автор популярного Telegram канала @cryptoainovosti. Пиши интересные посты на русском. Используй эмодзи. 100-150 слов. В конце добавь источник."},
+        {"role": "user", "content": f"Напиши пост для Telegram канала на основе новости:\n\nЗаголовок: {title}\nИсточник: {source}"}
+    ])
+
+def fetch_all_news():
     news = []
+
+    # CryptoPanic — агрегатор всех крипто новостей
     try:
         r = requests.get(
-            "https://cryptopanic.com/api/v1/posts/?auth_token=public&kind=news&limit=10",
+            "https://cryptopanic.com/api/v1/posts/?auth_token=public&kind=news&limit=20",
             timeout=10
         )
-        for i in r.json().get("results", [])[:5]:
-            news.append({"title": i["title"], "source": "CryptoPanic"})
+        for i in r.json().get("results", [])[:10]:
+            news.append({
+                "title": i["title"],
+                "source": "CryptoPanic",
+                "id": hashlib.md5(i["title"].encode()).hexdigest()
+            })
     except:
         pass
-    for url, tag in [
-        ("https://coindesk.com", "h4"),
-        ("https://cointelegraph.com", "h2"),
-        ("https://decrypt.co", "h3")
-    ]:
-        try:
-            r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-            soup = BeautifulSoup(r.text, "html.parser")
-            for t in soup.find_all(tag)[:2]:
-                text = t.get_text().strip()
-                if len(text) > 20:
-                    news.append({"title": text, "source": url.replace("https://", "")})
-        except:
-            pass
-    if not news:
-        news = [
-            {"title": "Bitcoin continues growth amid institutional buying", "source": "manual"},
-            {"title": "Ethereum network update attracts new developers", "source": "manual"},
-            {"title": "Crypto market shows positive dynamics", "source": "manual"}
-        ]
-    return news[:8]
 
-def write_post(news_list):
-    titles = " | ".join([n["title"] for n in news_list])
-    return ai([
-        {"role": "system", "content": "Ты крипто эксперт и автор популярного Telegram канала. Пиши интересные, информативные посты на русском языке. Используй эмодзи. Пост должен быть 150-200 слов."},
-        {"role": "user", "content": "Напиши пост для Telegram канала на основе этих новостей: " + titles}
-    ])
+    # CoinDesk
+    try:
+        r = requests.get("https://coindesk.com", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+        for t in soup.find_all("h4")[:5]:
+            text = t.get_text().strip()
+            if len(text) > 20:
+                news.append({
+                    "title": text,
+                    "source": "CoinDesk",
+                    "id": hashlib.md5(text.encode()).hexdigest()
+                })
+    except:
+        pass
 
-def scan_and_consult(chat):
-    send(chat, "🔍 <b>Агент 1</b> ищет свежие новости...")
-    news = get_news()
-    if not news:
-        send(chat, "❌ Новостей не найдено")
-        return
-    msg = "📰 <b>Агент 1 нашёл:</b>\n\n"
-    for i, n in enumerate(news):
-        msg += str(i+1) + ". " + n["title"] + "\n📌 " + n["source"] + "\n\n"
-    send(chat, msg)
-    send(chat, "✍️ <b>Агент 3</b> пишет пост и генерирует картинку...")
-    post = write_post(news)
-    img_prompt = get_image_prompt(news)
+    # CoinTelegraph
+    try:
+        r = requests.get("https://cointelegraph.com", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+        for t in soup.find_all("h2")[:5]:
+            text = t.get_text().strip()
+            if len(text) > 20:
+                news.append({
+                    "title": text,
+                    "source": "CoinTelegraph",
+                    "id": hashlib.md5(text.encode()).hexdigest()
+                })
+    except:
+        pass
+
+    # Decrypt
+    try:
+        r = requests.get("https://decrypt.co", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+        for t in soup.find_all("h3")[:5]:
+            text = t.get_text().strip()
+            if len(text) > 20:
+                news.append({
+                    "title": text,
+                    "source": "Decrypt",
+                    "id": hashlib.md5(text.encode()).hexdigest()
+                })
+    except:
+        pass
+
+    # Bitcoin Magazine
+    try:
+        r = requests.get("https://bitcoinmagazine.com", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+        for t in soup.find_all("h2")[:3]:
+            text = t.get_text().strip()
+            if len(text) > 20:
+                news.append({
+                    "title": text,
+                    "source": "Bitcoin Magazine",
+                    "id": hashlib.md5(text.encode()).hexdigest()
+                })
+    except:
+        pass
+
+    return news
+
+def prepare_and_send(chat, item):
+    title = item["title"]
+    source = item["source"]
+    send(chat, f"🔔 <b>Новая новость!</b>\n📌 {source}\n\n<i>{title}</i>\n\n✍️ Готовлю пост и фото...")
+    post = write_post(title, source)
+    img_prompt = get_image_prompt(title)
     img_url = generate_image(img_prompt)
     pid = str(int(time.time()))
-    pending[pid] = {"post": post, "news": news, "img": img_url}
+    pending[pid] = {"post": post, "img": img_url, "title": title}
     markup = {"inline_keyboard": [[
         {"text": "✅ Опубликовать", "callback_data": "ok_" + pid},
         {"text": "❌ Отклонить", "callback_data": "no_" + pid},
         {"text": "🔄 Переписать", "callback_data": "redo_" + pid},
         {"text": "🖼 Новое фото", "callback_data": "newimg_" + pid}
     ]]}
+    caption = f"📝 <b>Готовый пост:</b>\n\n{post}\n\n─────────────\nПубликовать в @cryptoainovosti?"
     if img_url:
-        send_photo(chat, img_url, "📝 <b>Готовый пост:</b>\n\n" + post + "\n\n─────────────\n<b>Агент 2</b> спрашивает: публиковать?", markup)
+        ok = send_photo(chat, img_url, caption, markup)
+        if not ok:
+            send(chat, caption, markup)
     else:
-        send(chat, "📝 <b>Готовый пост:</b>\n\n" + post + "\n\n─────────────\nПубликовать?", markup)
+        send(chat, caption, markup)
+
+def monitor_news():
+    while True:
+        if settings["auto_monitor"]:
+            try:
+                all_news = fetch_all_news()
+                for item in all_news:
+                    if item["id"] not in seen_news:
+                        seen_news.add(item["id"])
+                        prepare_and_send(CHAT_ID, item)
+                        time.sleep(5)
+            except Exception as e:
+                print("Ошибка мониторинга:", e)
+        time.sleep(300)
 
 def publish(chat, post, img_url=None):
     if img_url:
-        send_photo(CHANNEL, img_url, post)
-        send_photo(chat, img_url, "✅ <b>Пост с фото опубликован в</b> @cryptoainovosti!")
+        ok = send_photo(CHANNEL, img_url, post)
+        if ok:
+            send(chat, "✅ <b>Пост с фото опубликован в</b> @cryptoainovosti!")
+        else:
+            send(CHANNEL, post)
+            send(chat, "✅ <b>Пост опубликован в</b> @cryptoainovosti!")
     else:
         send(CHANNEL, post)
         send(chat, "✅ <b>Пост опубликован в</b> @cryptoainovosti!")
@@ -144,14 +206,10 @@ def assistant(chat, text):
     if len(chat_history[chat]) > 10:
         chat_history[chat] = chat_history[chat][-10:]
     system = """Ты главный AI ассистент крипто бота My Crypto Signals.
-Ты управляешь командой из 4 агентов:
-- Агент 1: ищет новости на CoinDesk, CoinTelegraph, Decrypt
-- Агент 2: консультирует и спрашивает одобрение
-- Агент 3: пишет посты и генерирует картинки
-- Агент 4: публикует посты в канал @cryptoainovosti
-
-Ты можешь отвечать на вопросы про крипто, объяснять рынок, давать советы.
-Отвечай на русском языке, используй эмодзи. Будь дружелюбным и профессиональным."""
+Ты мониторишь новости с CryptoPanic, CoinDesk, CoinTelegraph, Decrypt, Bitcoin Magazine.
+Как только появляется свежая новость — сразу генерируешь пост с фото и спрашиваешь одобрение.
+Публикуешь в канал @cryptoainovosti.
+Отвечай на русском языке, используй эмодзи."""
     messages = [{"role": "system", "content": system}] + chat_history[chat]
     response = ai(messages)
     chat_history[chat].append({"role": "assistant", "content": response})
@@ -177,26 +235,27 @@ def handle_callback(cb):
     elif data.startswith("redo_"):
         pid = data[5:]
         send(chat, "🔄 Переписываю пост...")
-        news = pending.get(pid, {}).get("news", get_news())
-        post = write_post(news)
+        title = pending.get(pid, {}).get("title", "crypto news")
+        post = write_post(title, "")
         img_url = pending.get(pid, {}).get("img")
-        pending[pid] = {"post": post, "news": news, "img": img_url}
+        pending[pid]["post"] = post
         markup = {"inline_keyboard": [[
             {"text": "✅ Опубликовать", "callback_data": "ok_" + pid},
             {"text": "❌ Отклонить", "callback_data": "no_" + pid},
             {"text": "🔄 Переписать", "callback_data": "redo_" + pid},
             {"text": "🖼 Новое фото", "callback_data": "newimg_" + pid}
         ]]}
+        caption = f"📝 <b>Новый вариант:</b>\n\n{post}\n\n─────────────\nПубликовать?"
         if img_url:
-            send_photo(chat, img_url, "📝 <b>Новый вариант:</b>\n\n" + post + "\n\n─────────────\nПубликовать?", markup)
+            send_photo(chat, img_url, caption, markup)
         else:
-            send(chat, "📝 <b>Новый вариант:</b>\n\n" + post + "\n\n─────────────\nПубликовать?", markup)
+            send(chat, caption, markup)
     elif data.startswith("newimg_"):
         pid = data[7:]
         send(chat, "🖼 Генерирую новую картинку...")
-        news = pending.get(pid, {}).get("news", [])
-        img_prompt = get_image_prompt(news)
-        img_url = generate_image(img_prompt + " " + str(int(time.time())))
+        title = pending.get(pid, {}).get("title", "crypto")
+        img_prompt = get_image_prompt(title)
+        img_url = generate_image(img_prompt)
         if pid in pending:
             pending[pid]["img"] = img_url
         post = pending.get(pid, {}).get("post", "")
@@ -209,14 +268,6 @@ def handle_callback(cb):
         if img_url:
             send_photo(chat, img_url, "🖼 <b>Новая картинка!</b>\n\n" + post, markup)
 
-def auto_post():
-    while True:
-        if settings["auto"]:
-            now = datetime.now()
-            if now.hour == 9 and now.minute == 0:
-                scan_and_consult(CHAT_ID)
-        time.sleep(60)
-
 def handle(msg):
     chat = str(msg["chat"]["id"])
     text = msg.get("text", "")
@@ -225,47 +276,54 @@ def handle(msg):
     if text == "/start":
         send(chat,
             "👋 <b>Crypto AI Bot</b>\n\n"
-            "🤖 Я твой главный AI ассистент!\n\n"
-            "Агенты:\n"
-            "🔍 Агент 1 — ищет свежие новости\n"
-            "🤝 Агент 2 — консультирует тебя\n"
-            "✍️ Агент 3 — пишет посты + генерирует фото\n"
-            "📢 Агент 4 — публикует в канал\n\n"
+            "🤖 Я слежу за новостями 24/7!\n\n"
+            "Источники:\n"
+            "📌 CryptoPanic\n"
+            "📌 CoinDesk\n"
+            "📌 CoinTelegraph\n"
+            "📌 Decrypt\n"
+            "📌 Bitcoin Magazine\n\n"
             "Команды:\n"
-            "/scan — найти новости и написать пост с фото\n"
-            "/news — только новости\n"
-            "/auto — автопост каждый день в 9:00\n"
-            "/stop — выключить автопост\n"
+            "/monitor — включить мониторинг новостей\n"
+            "/stop — выключить мониторинг\n"
+            "/scan — разовая проверка новостей\n"
+            "/news — показать свежие новости\n"
             "/settings — настройки\n\n"
             "💬 Или просто напиши мне что угодно!"
         )
+    elif text == "/monitor":
+        settings["auto_monitor"] = True
+        seen_news.clear()
+        send(chat, "✅ <b>Мониторинг включён!</b>\n\n🔔 Буду присылать каждую свежую новость с готовым постом и фото!\nПроверка каждые 5 минут.")
+    elif text == "/stop":
+        settings["auto_monitor"] = False
+        send(chat, "⏹ Мониторинг выключен")
     elif text == "/scan":
-        scan_and_consult(chat)
-    elif text == "/news":
         send(chat, "🔍 Ищу свежие новости...")
-        news = get_news()
-        msg2 = "📰 <b>Топ новости:</b>\n\n"
-        for i, n in enumerate(news):
+        news = fetch_all_news()
+        if news:
+            prepare_and_send(chat, news[0])
+        else:
+            send(chat, "❌ Новостей не найдено")
+    elif text == "/news":
+        send(chat, "🔍 Ищу новости...")
+        news = fetch_all_news()
+        msg2 = "📰 <b>Свежие новости:</b>\n\n"
+        for i, n in enumerate(news[:8]):
             msg2 += str(i+1) + ". " + n["title"] + "\n📌 " + n["source"] + "\n\n"
         send(chat, msg2)
-    elif text == "/auto":
-        settings["auto"] = True
-        send(chat, "✅ Автопост включён! Каждый день в 9:00")
-    elif text == "/stop":
-        settings["auto"] = False
-        send(chat, "⏹ Автопост выключен")
     elif text == "/settings":
         send(chat,
             "⚙️ <b>Настройки:</b>\n\n"
-            "Автопост: " + ("✅ Вкл" if settings["auto"] else "❌ Выкл") + "\n\n"
-            "Просто напиши мне чтобы изменить!\n"
-            "Например: 'включи автопост' или 'найди новости про биткоин'"
+            "Мониторинг: " + ("✅ Вкл" if settings["auto_monitor"] else "❌ Выкл") + "\n\n"
+            "Источники: CryptoPanic, CoinDesk, CoinTelegraph, Decrypt, Bitcoin Magazine\n"
+            "Интервал проверки: каждые 5 минут"
         )
     else:
         assistant(chat, text)
 
-threading.Thread(target=auto_post, daemon=True).start()
-send(CHAT_ID, "✅ <b>Crypto AI Bot запущен!</b>\n\n🤖 Все 4 агента готовы!\n🖼 Генерация фото включена!\nНапиши /start для начала.")
+threading.Thread(target=monitor_news, daemon=True).start()
+send(CHAT_ID, "✅ <b>Crypto AI Bot запущен!</b>\n\n🔔 Мониторинг новостей готов!\nНапиши /monitor чтобы начать получать свежие новости.")
 
 offset = 0
 print("Бот запущен!")

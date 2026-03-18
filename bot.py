@@ -33,75 +33,15 @@ CRYPTO_IMAGES = [
     "https://images.unsplash.com/photo-1592483648228-b35146a4330c?w=1024",
 ]
 
-RSS_SOURCES = [
-    # США и мировые
-    ("https://www.coindesk.com/arc/outboundfeeds/rss/", "CoinDesk", "en"),
-    ("https://cointelegraph.com/rss", "CoinTelegraph", "en"),
-    ("https://decrypt.co/feed", "Decrypt", "en"),
-    ("https://bitcoinmagazine.com/feed", "Bitcoin Magazine", "en"),
-    ("https://news.bitcoin.com/feed/", "Bitcoin.com", "en"),
-    ("https://cryptoslate.com/feed/", "CryptoSlate", "en"),
-    ("https://u.today/rss", "U.Today", "en"),
-    ("https://beincrypto.com/feed/", "BeInCrypto", "en"),
-    ("https://ambcrypto.com/feed/", "AMBCrypto", "en"),
-    ("https://cryptopotato.com/feed/", "CryptoPotato", "en"),
-    ("https://blockworks.co/feed", "Blockworks", "en"),
-    ("https://thedefiant.io/feed", "The Defiant", "en"),
-    ("https://coingape.com/feed/", "CoinGape", "en"),
-    ("https://cryptonews.com/news/feed/", "CryptoNews", "en"),
-    ("https://dailyhodl.com/feed/", "Daily Hodl", "en"),
-    # Русскоязычные
-    ("https://forklog.com/feed/", "ForkLog", "ru"),
-    ("https://bits.media/rss/news/", "Bits.Media", "ru"),
-    ("https://incrypted.com/feed/", "Incrypted", "ru"),
-    ("https://coinspot.io/feed/", "CoinSpot", "ru"),
-    ("https://cryptopanic.com/news/rss/", "CryptoPanic", "en"),
-    # Аналитика — TradingView, Medium, Substack
-    ("https://medium.com/feed/tag/bitcoin", "Medium Bitcoin", "en"),
-    ("https://medium.com/feed/tag/cryptocurrency", "Medium Crypto", "en"),
-    ("https://medium.com/feed/tag/trading", "Medium Trading", "en"),
-]
-
-BULLISH_KEYWORDS = [
-    "rally", "surge", "pump", "bull", "growth", "adoption", "partnership",
-    "launch", "upgrade", "listing", "etf", "approval", "investment",
-    "record", "all-time high", "ath", "breakthrough", "rises", "gains",
-    "soars", "jumps", "bounces", "recovers", "moon",
-    "рост", "ралли", "инвестиции", "листинг", "одобрение", "партнёрство",
-    "растёт", "рекорд", "пробой", "восстановление"
-]
-
-BEARISH_KEYWORDS = [
-    "crash", "drop", "fall", "bear", "hack", "exploit", "ban", "regulation",
-    "sec", "lawsuit", "bankruptcy", "fraud", "decline", "sell-off", "plunges",
-    "dump", "collapse", "warning", "risk", "concern", "fear",
-    "падение", "обвал", "взлом", "запрет", "регуляция", "банкротство",
-    "падает", "риск", "опасность", "предупреждение"
-]
-
-ANALYST_KEYWORDS = [
-    "analyst", "expert", "forecast", "prediction", "according to",
-    "report", "research", "study", "opinion", "analysis", "strategy",
-    "tradingview", "substack", "medium",
-    "аналитик", "эксперт", "прогноз", "мнение", "исследование", "стратегия"
-]
-
-SPAM_KEYWORDS = [
-    "sponsored", "advertisement", "casino", "gambling",
-    "giveaway", "get rich", "100x guaranteed", "free money"
-]
-
 def get_image(title):
     t = title.lower()
     if "bitcoin" in t or "btc" in t:
         return CRYPTO_IMAGES[0]
     elif "ethereum" in t or "eth" in t:
         return CRYPTO_IMAGES[1]
-    elif "nft" in t:
-        return CRYPTO_IMAGES[3]
-    elif "defi" in t:
-        return CRYPTO_IMAGES[4]
-    elif "trading" in t or "analyst" in t or "forecast" in t:
+    elif "oil" in t or "нефть" in t or "brent" in t:
+        return CRYPTO_IMAGES[7]
+    elif "trading" in t or "analyst" in t:
         return CRYPTO_IMAGES[5]
     else:
         return random.choice(CRYPTO_IMAGES)
@@ -139,12 +79,7 @@ def pin_msg(chat, msg_id):
         pass
 
 def send_photo(chat, photo_url, caption="", markup=None):
-    data = {
-        "chat_id": chat,
-        "photo": photo_url,
-        "caption": caption,
-        "parse_mode": "HTML"
-    }
+    data = {"chat_id": chat, "photo": photo_url, "caption": caption, "parse_mode": "HTML"}
     if markup:
         data["reply_markup"] = markup
     try:
@@ -157,15 +92,8 @@ def ai(messages):
     try:
         r = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
-            headers={
-                "Authorization": "Bearer " + GROQ_KEY,
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "llama-3.3-70b-versatile",
-                "messages": messages,
-                "max_tokens": 900
-            },
+            headers={"Authorization": "Bearer " + GROQ_KEY, "Content-Type": "application/json"},
+            json={"model": "llama-3.3-70b-versatile", "messages": messages, "max_tokens": 900},
             timeout=30
         )
         return r.json()["choices"][0]["message"]["content"]
@@ -277,7 +205,6 @@ def rates_updater():
                     if msg_id:
                         pinned_msg_id = msg_id
                         pin_msg(CHANNEL, msg_id)
-                        print(f"Новый закреп: {msg_id}")
             else:
                 msg_id = send(CHANNEL, text)
                 if msg_id:
@@ -288,28 +215,171 @@ def rates_updater():
             print("Ошибка курсов:", e)
         time.sleep(120)
 
+def fetch_cryptopanic():
+    news = []
+    try:
+        r = requests.get(
+            "https://cryptopanic.com/api/v1/posts/?auth_token=public&kind=news&limit=20",
+            timeout=10
+        )
+        for item in r.json().get("results", [])[:15]:
+            title = item.get("title", "")
+            url = item.get("url", "")
+            if title and len(title) > 15:
+                news.append({"title": title, "source": "CryptoPanic", "url": url, "lang": "en"})
+    except Exception as e:
+        print("CryptoPanic error:", e)
+    return news
+
+def fetch_rss(url, source, lang):
+    news = []
+    try:
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
+        soup = BeautifulSoup(r.content, "xml")
+        items = soup.find_all("item")
+        if not items:
+            soup = BeautifulSoup(r.content, "html.parser")
+            items = soup.find_all("item")
+        for item in items[:5]:
+            title_tag = item.find("title")
+            link_tag = item.find("link")
+            if not title_tag:
+                continue
+            t = title_tag.get_text().strip()
+            if not t or len(t) < 15:
+                continue
+            u = ""
+            if link_tag:
+                u = link_tag.get_text().strip() or link_tag.get("href", "")
+            news.append({"title": t, "source": source, "url": u, "lang": lang})
+    except Exception as e:
+        print(f"RSS error {source}: {e}")
+    return news
+
+def fetch_coindesk():
+    news = []
+    try:
+        r = requests.get("https://www.coindesk.com", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+        for tag in soup.find_all(["h3", "h4"])[:10]:
+            t = tag.get_text().strip()
+            if len(t) > 20:
+                news.append({"title": t, "source": "CoinDesk", "url": "https://coindesk.com", "lang": "en"})
+    except Exception as e:
+        print("CoinDesk error:", e)
+    return news
+
+def fetch_cointelegraph():
+    news = []
+    try:
+        r = requests.get("https://cointelegraph.com", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+        for tag in soup.find_all("h2")[:8]:
+            t = tag.get_text().strip()
+            if len(t) > 20:
+                news.append({"title": t, "source": "CoinTelegraph", "url": "https://cointelegraph.com", "lang": "en"})
+    except Exception as e:
+        print("CT error:", e)
+    return news
+
+def fetch_forklog():
+    news = []
+    try:
+        r = requests.get("https://forklog.com", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        soup = BeautifulSoup(r.text, "html.parser")
+        for tag in soup.find_all(["h2", "h3"])[:8]:
+            t = tag.get_text().strip()
+            if len(t) > 20:
+                news.append({"title": t, "source": "ForkLog", "url": "https://forklog.com", "lang": "ru"})
+    except Exception as e:
+        print("ForkLog error:", e)
+    return news
+
+def fetch_oil_news():
+    news = []
+    try:
+        r = requests.get(
+            "https://query1.finance.yahoo.com/v1/finance/search?q=oil+brent+price+news&newsCount=5",
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=10
+        )
+        data = r.json()
+        for item in data.get("news", [])[:5]:
+            title = item.get("title", "")
+            url = item.get("link", "")
+            if title and len(title) > 15:
+                news.append({"title": title, "source": "Yahoo Finance Oil", "url": url, "lang": "en"})
+    except Exception as e:
+        print("Oil news error:", e)
+    return news
+
 def classify_news(title):
     t = title.lower()
-    for w in SPAM_KEYWORDS:
+    spam = ["sponsored", "advertisement", "casino", "gambling", "giveaway", "get rich"]
+    for w in spam:
         if w in t:
             return None, 0
+    bullish = ["rally", "surge", "bull", "growth", "adoption", "listing", "etf", "approval",
+               "record", "ath", "rises", "gains", "soars", "jumps", "moon", "breakout",
+               "рост", "ралли", "листинг", "одобрение", "рекорд", "растёт"]
+    bearish = ["crash", "drop", "fall", "bear", "hack", "ban", "regulation", "sec",
+               "lawsuit", "bankruptcy", "fraud", "decline", "plunges", "dump", "collapse",
+               "падение", "обвал", "взлом", "запрет", "банкротство", "падает"]
+    analyst = ["analyst", "expert", "forecast", "prediction", "report", "research",
+               "opinion", "analysis", "strategy", "аналитик", "прогноз", "мнение"]
     score = 0
     category = "neutral"
-    for w in BULLISH_KEYWORDS:
+    for w in bullish:
         if w in t:
             score += 1
             category = "bull"
-    for w in BEARISH_KEYWORDS:
+    for w in bearish:
         if w in t:
             score += 1
             if category != "bull":
                 category = "bear"
-    for w in ANALYST_KEYWORDS:
+    for w in analyst:
         if w in t:
             score += 1
             if category == "neutral":
                 category = "analyst"
     return category, score
+
+def fetch_all_news():
+    all_news = []
+    all_news.extend(fetch_cryptopanic())
+    all_news.extend(fetch_coindesk())
+    all_news.extend(fetch_cointelegraph())
+    all_news.extend(fetch_forklog())
+    all_news.extend(fetch_oil_news())
+    rss_list = [
+        ("https://decrypt.co/feed", "Decrypt", "en"),
+        ("https://u.today/rss", "U.Today", "en"),
+        ("https://beincrypto.com/feed/", "BeInCrypto", "en"),
+        ("https://cryptopotato.com/feed/", "CryptoPotato", "en"),
+        ("https://news.bitcoin.com/feed/", "Bitcoin.com", "en"),
+        ("https://ambcrypto.com/feed/", "AMBCrypto", "en"),
+        ("https://bits.media/rss/news/", "Bits.Media", "ru"),
+        ("https://incrypted.com/feed/", "Incrypted", "ru"),
+        ("https://medium.com/feed/tag/bitcoin", "Medium Bitcoin", "en"),
+        ("https://medium.com/feed/tag/cryptocurrency", "Medium Crypto", "en"),
+    ]
+    for url, source, lang in rss_list:
+        all_news.extend(fetch_rss(url, source, lang))
+    seen = set()
+    unique = []
+    for item in all_news:
+        nid = hashlib.md5(item["title"].encode()).hexdigest()
+        if nid not in seen:
+            seen.add(nid)
+            category, score = classify_news(item["title"])
+            if category is not None:
+                item["category"] = category
+                item["score"] = score
+                item["id"] = nid
+                unique.append(item)
+    unique.sort(key=lambda x: x["score"], reverse=True)
+    return unique
 
 def fetch_article_text(url):
     try:
@@ -318,67 +388,19 @@ def fetch_article_text(url):
         for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
             tag.decompose()
         paragraphs = soup.find_all("p")
-        text = " ".join([
-            p.get_text().strip()
-            for p in paragraphs
-            if len(p.get_text().strip()) > 50
-        ])
+        text = " ".join([p.get_text().strip() for p in paragraphs if len(p.get_text().strip()) > 50])
         return text[:2000]
     except:
         return ""
 
-def fetch_all_news():
-    news = []
-    for rss_url, source, lang in RSS_SOURCES:
-        try:
-            r = requests.get(
-                rss_url,
-                headers={"User-Agent": "Mozilla/5.0"},
-                timeout=8
-            )
-            soup = BeautifulSoup(r.content, "xml")
-            items = soup.find_all("item")
-            if not items:
-                soup = BeautifulSoup(r.content, "html.parser")
-                items = soup.find_all("item")
-            for item in items[:4]:
-                title_tag = item.find("title")
-                link_tag = item.find("link")
-                if not title_tag:
-                    continue
-                t = title_tag.get_text().strip()
-                if not t or len(t) < 15:
-                    continue
-                u = ""
-                if link_tag:
-                    u = link_tag.get_text().strip()
-                    if not u:
-                        u = link_tag.get("href", "")
-                category, score = classify_news(t)
-                if category is not None:
-                    news.append({
-                        "title": t,
-                        "source": source,
-                        "url": u,
-                        "lang": lang,
-                        "category": category,
-                        "score": score,
-                        "id": hashlib.md5(t.encode()).hexdigest()
-                    })
-        except Exception as e:
-            print(f"Ошибка {source}: {e}")
-            continue
-    news.sort(key=lambda x: x["score"], reverse=True)
-    return news
-
 def write_post(title, source, article_text="", lang="en"):
     if article_text:
-        content = f"Заголовок: {title}\nИсточник: {source}\n\nТекст статьи:\n{article_text}"
+        content = f"Заголовок: {title}\nИсточник: {source}\n\nТекст:\n{article_text}"
     else:
         content = f"Заголовок: {title}\nИсточник: {source}"
     system = "Ты крипто эксперт и автор Telegram канала @cryptoainovosti."
     if lang == "en":
-        system += " Переведи текст с английского на русский и напиши интересный пост."
+        system += " Переведи с английского и напиши интересный пост на русском."
     else:
         system += " Напиши интересный пост на русском языке."
     system += " Используй эмодзи. 150-200 слов. Укажи источник в конце."
@@ -407,7 +429,7 @@ def prepare_and_send(chat, item):
         icon = "📰"
         label = "Новость"
     priority = "🔴 Срочно" if score >= 3 else "🟡 Важно"
-    send(chat, f"{priority} | {icon} <b>{label}</b>\n📌 {source}\n\n<i>{title}</i>\n\n✍️ Читаю и перевожу...")
+    send(chat, f"{priority} | {icon} <b>{label}</b>\n📌 {source}\n\n<i>{title}</i>\n\n✍️ Готовлю пост...")
     article_text = fetch_article_text(url) if url else ""
     post = write_post(title, source, article_text, lang)
     img_url = get_image(title)
@@ -439,12 +461,7 @@ def assistant(chat, text):
     chat_history[chat].append({"role": "user", "content": text})
     if len(chat_history[chat]) > 10:
         chat_history[chat] = chat_history[chat][-10:]
-    system = """Ты главный AI ассистент крипто канала @cryptoainovosti.
-Следишь за 23 источниками новостей включая Medium, TradingView аналитиков.
-Переводишь английские статьи на русский.
-Публикуешь в канал с красивыми фото.
-Обновляешь курсы в закрепе каждые 2 минуты.
-Отвечай на русском языке, используй эмодзи."""
+    system = "Ты главный AI ассистент крипто канала @cryptoainovosti. Отвечай на русском, используй эмодзи."
     messages = [{"role": "system", "content": system}] + chat_history[chat]
     response = ai(messages)
     chat_history[chat].append({"role": "assistant", "content": response})
@@ -464,8 +481,7 @@ def monitor_news():
                         time.sleep(20)
                         if new_count >= 5:
                             break
-                if new_count == 0:
-                    print("Новых новостей нет")
+                print(f"Новых новостей: {new_count}")
             except Exception as e:
                 print("Ошибка мониторинга:", e)
         time.sleep(300)
@@ -474,11 +490,7 @@ def handle_callback(cb):
     data = cb["data"]
     chat = str(cb["message"]["chat"]["id"])
     try:
-        requests.post(
-            API + "/answerCallbackQuery",
-            json={"callback_query_id": cb["id"]},
-            timeout=10
-        )
+        requests.post(API + "/answerCallbackQuery", json={"callback_query_id": cb["id"]}, timeout=10)
     except:
         pass
     if data.startswith("ok_"):
@@ -531,64 +543,48 @@ def handle(msg):
     if text == "/start":
         send(chat,
             "👋 <b>Crypto AI Bot</b>\n\n"
-            "🤖 Твой умный крипто ассистент!\n\n"
-            "📡 Курсы в закрепе канала — каждые 2 минуты\n\n"
-            "📰 23 источника новостей:\n"
-            "🇺🇸 CoinDesk, CoinTelegraph, Decrypt,\n"
-            "Bitcoin Magazine, Blockworks, BeInCrypto,\n"
-            "CryptoSlate, Daily Hodl, CryptoNews...\n"
-            "🇷🇺 ForkLog, Bits.Media, Incrypted, CoinSpot\n"
-            "📊 Medium, TradingView аналитики\n\n"
-            "Фильтры:\n"
-            "📈 Потенциальный рост\n"
-            "📉 Потенциальное падение\n"
-            "🔍 Мнения аналитиков\n\n"
+            "📡 Курсы в закрепе — каждые 2 минуты\n\n"
+            "📰 Источники:\n"
+            "🇺🇸 CryptoPanic, CoinDesk, CoinTelegraph,\n"
+            "Decrypt, U.Today, BeInCrypto, Bitcoin.com,\n"
+            "AMBCrypto, CryptoPotato, Medium\n"
+            "🇷🇺 ForkLog, Bits.Media, Incrypted\n"
+            "🛢 Yahoo Finance Oil — новости нефти\n\n"
+            "Фильтры: 📈 Рост · 📉 Падение · 🔍 Аналитика\n\n"
             "Команды:\n"
             "/monitor — мониторинг новостей\n"
             "/stop — выключить\n"
             "/scan — разовая проверка\n"
             "/news — свежие новости\n"
-            "/rates — курсы прямо сейчас\n\n"
+            "/rates — курсы\n\n"
             "💬 Или напиши мне что угодно!"
         )
     elif text == "/monitor":
         settings["auto_monitor"] = True
         seen_news.clear()
-        send(chat,
-            "✅ <b>Мониторинг включён!</b>\n\n"
-            "📈 Рост · 📉 Падение · 🔍 Аналитика\n"
-            "23 источника · Проверка каждые 5 минут\n"
-            "Английские статьи переводятся на русский"
-        )
+        send(chat, "✅ <b>Мониторинг включён!</b>\nПроверка каждые 5 минут · 15+ источников")
     elif text == "/stop":
         settings["auto_monitor"] = False
         send(chat, "⏹ Мониторинг выключен")
     elif text == "/scan":
-        send(chat, "🔍 Сканирую 23 источника...")
+        send(chat, "🔍 Сканирую источники...")
         news = fetch_all_news()
         if news:
             prepare_and_send(chat, news[0])
         else:
-            send(chat, "❌ Новостей не найдено — попробуй позже")
+            send(chat, "❌ Попробуй позже")
     elif text == "/news":
         send(chat, "🔍 Загружаю новости...")
         news = fetch_all_news()
         if not news:
-            send(chat, "❌ Новостей не найдено — попробуй позже")
+            send(chat, "❌ Попробуй позже")
             return
         msg2 = "📰 <b>Свежие новости:</b>\n\n"
         for n in news[:10]:
-            if n["category"] == "bull":
-                icon = "📈"
-            elif n["category"] == "bear":
-                icon = "📉"
-            elif n["category"] == "analyst":
-                icon = "🔍"
-            else:
-                icon = "📰"
+            icon = "📈" if n["category"] == "bull" else "📉" if n["category"] == "bear" else "🔍" if n["category"] == "analyst" else "📰"
+            flag = "🇷🇺" if n["lang"] == "ru" else "🇺🇸"
             priority = "🔴" if n["score"] >= 3 else "🟡"
-            lang_flag = "🇷🇺" if n["lang"] == "ru" else "🇺🇸"
-            msg2 += f"{priority}{icon}{lang_flag} {n['title']}\n📌 {n['source']}\n\n"
+            msg2 += f"{priority}{icon}{flag} {n['title']}\n📌 {n['source']}\n\n"
         send(chat, msg2)
     elif text == "/rates":
         send(chat, format_rates())
@@ -599,22 +595,16 @@ threading.Thread(target=rates_updater, daemon=True).start()
 threading.Thread(target=monitor_news, daemon=True).start()
 
 send(CHAT_ID,
-    "✅ <b>Crypto AI Bot запущен!</b>\n\n"
-    "📡 Курсы появятся в канале через 10 сек\n"
-    "📰 23 источника · Перевод с английского\n"
-    "🖼 Фото к каждому посту\n"
-    "Напиши /start для начала!"
+    "✅ <b>Бот запущен!</b>\n"
+    "📡 Курсы появятся в закрепе через 10 сек\n"
+    "Напиши /start"
 )
 
 offset = 0
 print("Бот запущен!")
 while True:
     try:
-        r = requests.get(
-            API + "/getUpdates",
-            params={"offset": offset, "timeout": 30},
-            timeout=35
-        )
+        r = requests.get(API + "/getUpdates", params={"offset": offset, "timeout": 30}, timeout=35)
         for u in r.json().get("result", []):
             offset = u["update_id"] + 1
             if "message" in u:

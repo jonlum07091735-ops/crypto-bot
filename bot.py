@@ -605,6 +605,24 @@ def handle_callback(cb):
         ok = send_photo(chat, img_url, caption, markup)
         if not ok:
             send(chat, caption, markup)
+    elif data == "update_rates":
+        text_rates = format_rates()
+        if pinned_msg_id:
+            ok = edit_msg(CHANNEL, pinned_msg_id, text_rates)
+            if ok:
+                send(chat, "✅ Закреп в канале обновлён!")
+            else:
+                msg_id = send(CHANNEL, text_rates)
+                if msg_id:
+                    pinned_msg_id = msg_id
+                    pin_msg(CHANNEL, msg_id)
+                    send(chat, "✅ Закреп обновлён!")
+        else:
+            msg_id = send(CHANNEL, text_rates)
+            if msg_id:
+                pinned_msg_id = msg_id
+                pin_msg(CHANNEL, msg_id)
+                send(chat, "✅ Закреп создан в канале!")
     elif data.startswith("newimg_"):
         pid = data[7:]
         title = pending.get(pid, {}).get("title", "crypto")
@@ -668,7 +686,11 @@ def handle(msg):
             msg2 += f"{priority}{icon}{flag} {n['title']}\n📌 {n['source']}\n\n"
         send(chat, msg2)
     elif text == "/rates":
-        send(chat, format_rates())
+        text_rates = format_rates()
+        markup = {"inline_keyboard": [[
+            {"text": "🔄 Обновить закреп в канале", "callback_data": "update_rates"}
+        ]]}
+        send(chat, text_rates, markup)
     else:
         assistant(chat, text)
 

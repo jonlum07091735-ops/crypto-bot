@@ -20,31 +20,55 @@ chat_history = {}
 seen_news = set()
 pinned_msg_id = None
 
-CRYPTO_IMAGES = [
-    "https://images.unsplash.com/photo-1518544801976-3e159e50e5bb?w=1024",
-    "https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=1024",
-    "https://images.unsplash.com/photo-1523961131990-5ea7c61b2107?w=1024",
-    "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=1024",
-    "https://images.unsplash.com/photo-1605792657660-596af9009e82?w=1024",
-    "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=1024",
-    "https://images.unsplash.com/photo-1640340434855-6084b1f4901c?w=1024",
-    "https://images.unsplash.com/photo-1630926854574-977b8e04c58c?w=1024",
-    "https://images.unsplash.com/photo-1622630998477-20aa696ecb05?w=1024",
-    "https://images.unsplash.com/photo-1592483648228-b35146a4330c?w=1024",
-]
+# Категории фото для Unsplash — каждый раз случайное фото по теме
+PHOTO_QUERIES = {
+    "bitcoin": ["bitcoin", "btc cryptocurrency", "bitcoin gold coin", "bitcoin mining", "crypto bitcoin"],
+    "ethereum": ["ethereum", "eth blockchain", "ethereum crypto", "digital currency", "crypto ethereum"],
+    "trading": ["stock trading", "financial charts", "trading screen", "market analysis", "forex trading"],
+    "bull": ["bull market", "growth chart", "financial success", "stock market up", "green chart"],
+    "bear": ["bear market", "financial crisis", "stock market crash", "red chart", "market down"],
+    "analyst": ["business analysis", "financial report", "data analytics", "expert analysis", "market research"],
+    "defi": ["defi blockchain", "decentralized finance", "smart contract", "web3", "blockchain network"],
+    "nft": ["digital art", "nft artwork", "metaverse", "virtual reality art", "digital collectible"],
+    "oil": ["oil refinery", "crude oil", "brent crude", "oil price", "petroleum industry"],
+    "regulation": ["government regulation", "law finance", "financial regulation", "crypto law", "compliance"],
+    "default": ["cryptocurrency", "blockchain technology", "crypto market", "digital finance", "fintech"]
+}
+
+def get_unsplash_image(query):
+    try:
+        seed = random.randint(1, 9999)
+        encoded = requests.utils.quote(query)
+        url = f"https://source.unsplash.com/1024x512/?{encoded}&sig={seed}"
+        return url
+    except:
+        return "https://images.unsplash.com/photo-1518544801976-3e159e50e5bb?w=1024"
 
 def get_image(title):
     t = title.lower()
     if "bitcoin" in t or "btc" in t:
-        return CRYPTO_IMAGES[0]
+        query = random.choice(PHOTO_QUERIES["bitcoin"])
     elif "ethereum" in t or "eth" in t:
-        return CRYPTO_IMAGES[1]
-    elif "oil" in t or "нефть" in t or "brent" in t:
-        return CRYPTO_IMAGES[7]
-    elif "trading" in t or "analyst" in t:
-        return CRYPTO_IMAGES[5]
+        query = random.choice(PHOTO_QUERIES["ethereum"])
+    elif "oil" in t or "нефть" in t or "brent" in t or "crude" in t:
+        query = random.choice(PHOTO_QUERIES["oil"])
+    elif "nft" in t:
+        query = random.choice(PHOTO_QUERIES["nft"])
+    elif "defi" in t or "decentralized" in t:
+        query = random.choice(PHOTO_QUERIES["defi"])
+    elif "regulation" in t or "sec" in t or "ban" in t or "law" in t:
+        query = random.choice(PHOTO_QUERIES["regulation"])
+    elif "analyst" in t or "forecast" in t or "prediction" in t:
+        query = random.choice(PHOTO_QUERIES["analyst"])
+    elif "crash" in t or "drop" in t or "fall" in t or "bear" in t:
+        query = random.choice(PHOTO_QUERIES["bear"])
+    elif "rally" in t or "surge" in t or "bull" in t or "ath" in t:
+        query = random.choice(PHOTO_QUERIES["bull"])
+    elif "trading" in t or "trade" in t:
+        query = random.choice(PHOTO_QUERIES["trading"])
     else:
-        return random.choice(CRYPTO_IMAGES)
+        query = random.choice(PHOTO_QUERIES["default"])
+    return get_unsplash_image(query)
 
 def send(chat, text, markup=None):
     data = {"chat_id": chat, "text": text, "parse_mode": "HTML"}
@@ -195,25 +219,64 @@ def format_rates():
 def rates_updater():
     global pinned_msg_id
     time.sleep(10)
+    text = format_rates()
+    msg_id = send(CHANNEL, text)
+    if msg_id:
+        pinned_msg_id = msg_id
+        pin_msg(CHANNEL, msg_id)
+        print(f"Закреп создан: {msg_id}")
     while True:
+        time.sleep(120)
         try:
             text = format_rates()
             if pinned_msg_id:
                 ok = edit_msg(CHANNEL, pinned_msg_id, text)
+                print(f"Курсы обновлены: {ok}")
                 if not ok:
                     msg_id = send(CHANNEL, text)
                     if msg_id:
                         pinned_msg_id = msg_id
                         pin_msg(CHANNEL, msg_id)
+                        print(f"Новый закреп: {msg_id}")
             else:
                 msg_id = send(CHANNEL, text)
                 if msg_id:
                     pinned_msg_id = msg_id
                     pin_msg(CHANNEL, msg_id)
-                    print(f"Курсы закреплены: {msg_id}")
         except Exception as e:
             print("Ошибка курсов:", e)
-        time.sleep(120)
+
+def classify_news(title):
+    t = title.lower()
+    spam = ["sponsored", "advertisement", "casino", "gambling", "giveaway", "get rich"]
+    for w in spam:
+        if w in t:
+            return None, 0
+    bullish = ["rally", "surge", "bull", "growth", "adoption", "listing", "etf", "approval",
+               "record", "ath", "rises", "gains", "soars", "jumps", "moon", "breakout",
+               "рост", "ралли", "листинг", "одобрение", "рекорд", "растёт"]
+    bearish = ["crash", "drop", "fall", "bear", "hack", "ban", "regulation", "sec",
+               "lawsuit", "bankruptcy", "fraud", "decline", "plunges", "dump",
+               "падение", "обвал", "взлом", "запрет", "банкротство", "падает"]
+    analyst = ["analyst", "expert", "forecast", "prediction", "report", "research",
+               "opinion", "analysis", "strategy", "аналитик", "прогноз", "мнение"]
+    score = 0
+    category = "neutral"
+    for w in bullish:
+        if w in t:
+            score += 1
+            category = "bull"
+    for w in bearish:
+        if w in t:
+            score += 1
+            if category != "bull":
+                category = "bear"
+    for w in analyst:
+        if w in t:
+            score += 1
+            if category == "neutral":
+                category = "analyst"
+    return category, score
 
 def fetch_cryptopanic():
     news = []
@@ -256,101 +319,44 @@ def fetch_rss(url, source, lang):
         print(f"RSS error {source}: {e}")
     return news
 
-def fetch_coindesk():
+def fetch_site(url, source, lang, tags=["h2", "h3"]):
     news = []
     try:
-        r = requests.get("https://www.coindesk.com", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
         soup = BeautifulSoup(r.text, "html.parser")
-        for tag in soup.find_all(["h3", "h4"])[:10]:
-            t = tag.get_text().strip()
-            if len(t) > 20:
-                news.append({"title": t, "source": "CoinDesk", "url": "https://coindesk.com", "lang": "en"})
+        for tag_name in tags:
+            for tag in soup.find_all(tag_name)[:8]:
+                t = tag.get_text().strip()
+                if len(t) > 20 and len(t) < 200:
+                    news.append({"title": t, "source": source, "url": url, "lang": lang})
     except Exception as e:
-        print("CoinDesk error:", e)
-    return news
-
-def fetch_cointelegraph():
-    news = []
-    try:
-        r = requests.get("https://cointelegraph.com", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for tag in soup.find_all("h2")[:8]:
-            t = tag.get_text().strip()
-            if len(t) > 20:
-                news.append({"title": t, "source": "CoinTelegraph", "url": "https://cointelegraph.com", "lang": "en"})
-    except Exception as e:
-        print("CT error:", e)
-    return news
-
-def fetch_forklog():
-    news = []
-    try:
-        r = requests.get("https://forklog.com", headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        soup = BeautifulSoup(r.text, "html.parser")
-        for tag in soup.find_all(["h2", "h3"])[:8]:
-            t = tag.get_text().strip()
-            if len(t) > 20:
-                news.append({"title": t, "source": "ForkLog", "url": "https://forklog.com", "lang": "ru"})
-    except Exception as e:
-        print("ForkLog error:", e)
+        print(f"Site error {source}: {e}")
     return news
 
 def fetch_oil_news():
     news = []
     try:
         r = requests.get(
-            "https://query1.finance.yahoo.com/v1/finance/search?q=oil+brent+price+news&newsCount=5",
+            "https://query1.finance.yahoo.com/v1/finance/search?q=oil+brent+price&newsCount=5",
             headers={"User-Agent": "Mozilla/5.0"},
             timeout=10
         )
-        data = r.json()
-        for item in data.get("news", [])[:5]:
+        for item in r.json().get("news", [])[:5]:
             title = item.get("title", "")
             url = item.get("link", "")
             if title and len(title) > 15:
-                news.append({"title": title, "source": "Yahoo Finance Oil", "url": url, "lang": "en"})
+                news.append({"title": title, "source": "Yahoo Finance", "url": url, "lang": "en"})
     except Exception as e:
         print("Oil news error:", e)
     return news
 
-def classify_news(title):
-    t = title.lower()
-    spam = ["sponsored", "advertisement", "casino", "gambling", "giveaway", "get rich"]
-    for w in spam:
-        if w in t:
-            return None, 0
-    bullish = ["rally", "surge", "bull", "growth", "adoption", "listing", "etf", "approval",
-               "record", "ath", "rises", "gains", "soars", "jumps", "moon", "breakout",
-               "рост", "ралли", "листинг", "одобрение", "рекорд", "растёт"]
-    bearish = ["crash", "drop", "fall", "bear", "hack", "ban", "regulation", "sec",
-               "lawsuit", "bankruptcy", "fraud", "decline", "plunges", "dump", "collapse",
-               "падение", "обвал", "взлом", "запрет", "банкротство", "падает"]
-    analyst = ["analyst", "expert", "forecast", "prediction", "report", "research",
-               "opinion", "analysis", "strategy", "аналитик", "прогноз", "мнение"]
-    score = 0
-    category = "neutral"
-    for w in bullish:
-        if w in t:
-            score += 1
-            category = "bull"
-    for w in bearish:
-        if w in t:
-            score += 1
-            if category != "bull":
-                category = "bear"
-    for w in analyst:
-        if w in t:
-            score += 1
-            if category == "neutral":
-                category = "analyst"
-    return category, score
-
 def fetch_all_news():
     all_news = []
     all_news.extend(fetch_cryptopanic())
-    all_news.extend(fetch_coindesk())
-    all_news.extend(fetch_cointelegraph())
-    all_news.extend(fetch_forklog())
+    all_news.extend(fetch_site("https://www.coindesk.com", "CoinDesk", "en", ["h4", "h3"]))
+    all_news.extend(fetch_site("https://cointelegraph.com", "CoinTelegraph", "en", ["h2"]))
+    all_news.extend(fetch_site("https://forklog.com", "ForkLog", "ru", ["h2", "h3"]))
+    all_news.extend(fetch_site("https://bits.media", "Bits.Media", "ru", ["h2", "h3"]))
     all_news.extend(fetch_oil_news())
     rss_list = [
         ("https://decrypt.co/feed", "Decrypt", "en"),
@@ -359,10 +365,10 @@ def fetch_all_news():
         ("https://cryptopotato.com/feed/", "CryptoPotato", "en"),
         ("https://news.bitcoin.com/feed/", "Bitcoin.com", "en"),
         ("https://ambcrypto.com/feed/", "AMBCrypto", "en"),
-        ("https://bits.media/rss/news/", "Bits.Media", "ru"),
         ("https://incrypted.com/feed/", "Incrypted", "ru"),
         ("https://medium.com/feed/tag/bitcoin", "Medium Bitcoin", "en"),
         ("https://medium.com/feed/tag/cryptocurrency", "Medium Crypto", "en"),
+        ("https://medium.com/feed/tag/trading", "Medium Trading", "en"),
     ]
     for url, source, lang in rss_list:
         all_news.extend(fetch_rss(url, source, lang))
@@ -484,7 +490,7 @@ def monitor_news():
                 print(f"Новых новостей: {new_count}")
             except Exception as e:
                 print("Ошибка мониторинга:", e)
-        time.sleep(300)
+        time.sleep(1800)
 
 def handle_callback(cb):
     data = cb["data"]
@@ -523,7 +529,8 @@ def handle_callback(cb):
             send(chat, caption, markup)
     elif data.startswith("newimg_"):
         pid = data[7:]
-        new_img = random.choice(CRYPTO_IMAGES)
+        title = pending.get(pid, {}).get("title", "crypto")
+        new_img = get_image(title + str(random.randint(1, 9999)))
         if pid in pending:
             pending[pid]["img"] = new_img
         post = pending.get(pid, {}).get("post", "")
@@ -543,26 +550,26 @@ def handle(msg):
     if text == "/start":
         send(chat,
             "👋 <b>Crypto AI Bot</b>\n\n"
-            "📡 Курсы в закрепе — каждые 2 минуты\n\n"
-            "📰 Источники:\n"
+            "📡 Курсы в закрепе — каждые 2 минуты\n"
+            "🖼 Фото — миллионы уникальных через Unsplash\n\n"
+            "📰 15+ источников:\n"
             "🇺🇸 CryptoPanic, CoinDesk, CoinTelegraph,\n"
             "Decrypt, U.Today, BeInCrypto, Bitcoin.com,\n"
-            "AMBCrypto, CryptoPotato, Medium\n"
+            "Medium, AMBCrypto, CryptoPotato\n"
             "🇷🇺 ForkLog, Bits.Media, Incrypted\n"
-            "🛢 Yahoo Finance Oil — новости нефти\n\n"
-            "Фильтры: 📈 Рост · 📉 Падение · 🔍 Аналитика\n\n"
+            "🛢 Yahoo Finance Oil\n\n"
             "Команды:\n"
-            "/monitor — мониторинг новостей\n"
+            "/monitor — мониторинг каждые 30 мин\n"
             "/stop — выключить\n"
             "/scan — разовая проверка\n"
             "/news — свежие новости\n"
             "/rates — курсы\n\n"
-            "💬 Или напиши мне что угодно!"
+            "💬 Напиши мне что угодно!"
         )
     elif text == "/monitor":
         settings["auto_monitor"] = True
         seen_news.clear()
-        send(chat, "✅ <b>Мониторинг включён!</b>\nПроверка каждые 5 минут · 15+ источников")
+        send(chat, "✅ <b>Мониторинг включён!</b>\nПроверка каждые 30 минут · 15+ источников")
     elif text == "/stop":
         settings["auto_monitor"] = False
         send(chat, "⏹ Мониторинг выключен")
@@ -597,6 +604,8 @@ threading.Thread(target=monitor_news, daemon=True).start()
 send(CHAT_ID,
     "✅ <b>Бот запущен!</b>\n"
     "📡 Курсы появятся в закрепе через 10 сек\n"
+    "🖼 Миллионы уникальных фото\n"
+    "⏱ Мониторинг каждые 30 минут\n"
     "Напиши /start"
 )
 

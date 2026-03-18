@@ -291,17 +291,33 @@ def format_rates():
     lines.append(f"📌 @cryptoainovosti")
     return "\n".join(lines)
 
+def save_pin_id(msg_id):
+    try:
+        with open("/tmp/pin_id.txt", "w") as f:
+            f.write(str(msg_id))
+    except:
+        pass
+
+def load_pin_id():
+    try:
+        with open("/tmp/pin_id.txt", "r") as f:
+            return int(f.read().strip())
+    except:
+        return None
+
 def rates_updater():
     global pinned_msg_id
+    pinned_msg_id = load_pin_id()
     time.sleep(10)
-    text = format_rates()
-    msg_id = send(CHANNEL, text)
-    if msg_id:
-        pinned_msg_id = msg_id
-        pin_msg(CHANNEL, msg_id)
-        print(f"Закреп создан: {msg_id}")
+    if not pinned_msg_id:
+        text = format_rates()
+        msg_id = send(CHANNEL, text)
+        if msg_id:
+            pinned_msg_id = msg_id
+            pin_msg(CHANNEL, msg_id)
+            save_pin_id(msg_id)
+            print(f"Закреп создан: {msg_id}")
     while True:
-        time.sleep(120)
         try:
             text = format_rates()
             if pinned_msg_id:
@@ -312,13 +328,17 @@ def rates_updater():
                     if msg_id:
                         pinned_msg_id = msg_id
                         pin_msg(CHANNEL, msg_id)
+                        save_pin_id(msg_id)
+                        print(f"Новый закреп: {msg_id}")
             else:
                 msg_id = send(CHANNEL, text)
                 if msg_id:
                     pinned_msg_id = msg_id
                     pin_msg(CHANNEL, msg_id)
+                    save_pin_id(msg_id)
         except Exception as e:
             print("Ошибка курсов:", e)
+        time.sleep(120)
 
 def classify_news(title):
     t = title.lower()
@@ -476,6 +496,182 @@ def fetch_article_text(url):
         return text[:2000]
     except:
         return ""
+
+def get_top10_prices():
+    top10 = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
+             "ADAUSDT", "DOGEUSDT", "AVAXUSDT", "DOTUSDT", "MATICUSDT"]
+    prices = {}
+    try:
+        for sym in top10:
+            r = requests.get(
+                "https://api.bybit.com/v5/market/tickers",
+                params={"category": "spot", "symbol": sym},
+                timeout=5
+            )
+            data = r.json().get("result", {}).get("list", [])
+            if data:
+                prices[sym] = {
+                    "price": float(data[0].get("lastPrice", 0)),
+                    "change": float(data[0].get("price24hPcnt", 0)) * 100
+                }
+    except:
+        pass
+    return prices
+
+def format_top10(prices):
+    icons = {
+        "BTCUSDT": "🟡", "ETHUSDT": "🔵", "BNBUSDT": "🟠",
+        "SOLUSDT": "🟣", "XRPUSDT": "🔵", "ADAUSDT": "🔵",
+        "DOGEUSDT": "🟡", "AVAXUSDT": "🔴", "DOTUSDT": "🔴",
+        "MATICUSDT": "🟣"
+    }
+    names = {
+        "BTCUSDT": "BTC", "ETHUSDT": "ETH", "BNBUSDT": "BNB",
+        "SOLUSDT": "SOL", "XRPUSDT": "XRP", "ADAUSDT": "ADA",
+        "DOGEUSDT": "DOGE", "AVAXUSDT": "AVAX", "DOTUSDT": "DOT",
+        "MATICUSDT": "MATIC"
+    }
+    lines = ["📊 <b>Топ 10 монет:</b>"]
+    for sym, data in prices.items():
+        p = data["price"]
+        c = data["change"]
+        a = "↑" if c >= 0 else "↓"
+        sign = "+" if c >= 0 else ""
+        price_str = f"{p:,.2f}" if p > 1 else f"{p:.4f}"
+        icon = icons.get(sym, "⚪")
+        name = names.get(sym, sym.replace("USDT", ""))
+        lines.append(f"{icon} {name}: ${price_str} {a} {sign}{c:.1f}%")
+    return "\n".join(lines)
+
+def get_top_movers():
+    try:
+        r = requests.get(
+            "https://api.bybit.com/v5/market/tickers",
+            params={"category": "spot"},
+            timeout=10
+        )
+        tickers = r.json().get("result", {}).get("list", [])
+        movers = []
+        for t in tickers:
+            sym = t.get("symbol", "")
+            if not sym.endswith("USDT"):
+                continue
+            try:
+                price = float(t.get("lastPrice", 0))
+                change = float(t.get("price24hPcnt", 0)) * 100
+                volume = float(t.get("turnover24h", 0))
+                if volume > 1000000 and price > 0:
+                    movers.append({"symbol": sym.replace("USDT", ""), "price": price, "change": change, "volume": volume})
+            except:
+                continue
+        gainers = sorted(movers, key=lambda x: x["change"], reverse=True)[:3]
+        losers = sorted(movers, key=lambda x: x["change"])[:3]
+        return gainers, losers
+    except:
+        return [], []
+
+def format_movers(gainers, losers):
+    text = ""
+    if gainers:
+        text += "🚀 <b>Топ роста за 24ч:</b>\n"
+        for m in gainers:
+            text += f"  🟢 {m['symbol']}: ${m['price']:,.4f} ↑ +{m['change']:.1f}%\n"
+    if losers:
+        text += "\n💀 <b>Топ падения за 24ч:</b>\n"
+        for m in losers:
+            text += f"  🔴 {m['symbol']}: ${m['price']:,.4f} ↓ {m['change']:.1f}%\n"
+    return text
+
+def send_poll(question, options):
+    try:
+        requests.post(API + "/sendPoll", json={
+            "chat_id": CHANNEL,
+            "question": question,
+            "options": options,
+            "is_anonymous": True
+        }, timeout=10)
+    except:
+        pass
+
+def morning_review():
+    crypto = get_crypto_prices()
+    top10 = get_top10_prices()
+    gainers, losers = get_top_movers()
+    btc = crypto.get("BTCUSDT", {})
+    eth = crypto.get("ETHUSDT", {})
+    sol = crypto.get("SOLUSDT", {})
+    btc_p = btc.get("price", 0)
+    btc_c = btc.get("change", 0)
+    eth_p = eth.get("price", 0)
+    eth_c = eth.get("change", 0)
+    sol_p = sol.get("price", 0)
+    sol_c = sol.get("change", 0)
+    now = datetime.now().strftime("%d.%m.%Y")
+    gainers_text = ", ".join([f"{m['symbol']} +{m['change']:.1f}%" for m in gainers])
+    losers_text = ", ".join([f"{m['symbol']} {m['change']:.1f}%" for m in losers])
+    review = ai([
+        {"role": "system", "content": "Ты крипто аналитик канала @cryptoainovosti. Напиши утренний обзор рынка на русском. Используй эмодзи. 180-220 слов. Упомяни топ монеты роста и падения. Дай прогноз на день."},
+        {"role": "user", "content": f"Данные на {now}:\nBTC: ${btc_p:,.0f} ({'+' if btc_c >= 0 else ''}{btc_c:.1f}%)\nETH: ${eth_p:,.0f} ({'+' if eth_c >= 0 else ''}{eth_c:.1f}%)\nSOL: ${sol_p:.2f} ({'+' if sol_c >= 0 else ''}{sol_c:.1f}%)\nТоп роста: {gainers_text}\nТоп падения: {losers_text}"}
+    ])
+    top10_text = format_top10(top10)
+    movers_text = format_movers(gainers, losers)
+    img = get_image("trading bull market morning analysis")
+    caption = f"🌅 <b>Утренний обзор рынка</b>\n📅 {now}\n\n{review}\n\n{top10_text}\n\n{movers_text}"
+    send_photo(CHANNEL, img, caption)
+    time.sleep(3)
+    if gainers:
+        top_gainer = gainers[0]["symbol"]
+        send_poll(
+            f"📊 {top_gainer} вырос на {gainers[0]['change']:.1f}% за ночь. Что думаешь?",
+            ["🚀 Продолжит рост", "📉 Скоро откат", "🤷 Не знаю"]
+        )
+    else:
+        send_poll(
+            "📊 Как думаешь, куда пойдёт BTC сегодня?",
+            ["📈 Вырастет", "📉 Упадёт", "➡️ Будет боковик"]
+        )
+
+def evening_summary():
+    crypto = get_crypto_prices()
+    top10 = get_top10_prices()
+    gainers, losers = get_top_movers()
+    btc = crypto.get("BTCUSDT", {})
+    eth = crypto.get("ETHUSDT", {})
+    bnb = crypto.get("BNBUSDT", {})
+    sol = crypto.get("SOLUSDT", {})
+    xrp = crypto.get("XRPUSDT", {})
+    now = datetime.now().strftime("%d.%m.%Y")
+    gainers_text = ", ".join([f"{m['symbol']} +{m['change']:.1f}%" for m in gainers])
+    losers_text = ", ".join([f"{m['symbol']} {m['change']:.1f}%" for m in losers])
+    summary = ai([
+        {"role": "system", "content": "Ты крипто аналитик канала @cryptoainovosti. Напиши вечерние итоги дня на русском. Используй эмодзи. 180-220 слов. Упомяни топ монеты роста и падения за день. Дай прогноз на завтра."},
+        {"role": "user", "content": f"Итоги {now}:\nBTC: ${btc.get('price',0):,.0f} ({'+' if btc.get('change',0) >= 0 else ''}{btc.get('change',0):.1f}%)\nETH: ${eth.get('price',0):,.0f} ({'+' if eth.get('change',0) >= 0 else ''}{eth.get('change',0):.1f}%)\nBNB: ${bnb.get('price',0):.0f}\nSOL: ${sol.get('price',0):.2f}\nXRP: ${xrp.get('price',0):.4f}\nТоп роста: {gainers_text}\nТоп падения: {losers_text}"}
+    ])
+    top10_text = format_top10(top10)
+    movers_text = format_movers(gainers, losers)
+    img = get_image("trading analysis evening results market")
+    caption = f"🌙 <b>Итоги дня</b>\n📅 {now}\n\n{summary}\n\n{top10_text}\n\n{movers_text}"
+    send_photo(CHANNEL, img, caption)
+    time.sleep(3)
+    send_poll(
+        "🔮 Прогноз на завтра?",
+        ["🟢 Рынок вырастет", "🔴 Рынок упадёт", "🟡 Без изменений", "🤷 Сложно сказать"]
+    )
+
+def daily_scheduler():
+    while True:
+        now = datetime.now()
+        if now.hour == 9 and now.minute == 0:
+            try:
+                morning_review()
+            except Exception as e:
+                print("Ошибка утреннего обзора:", e)
+        if now.hour == 20 and now.minute == 0:
+            try:
+                evening_summary()
+            except Exception as e:
+                print("Ошибка вечерних итогов:", e)
+        time.sleep(60)
 
 def write_post(title, source, article_text="", lang="en"):
     if article_text:
@@ -696,11 +892,14 @@ def handle(msg):
 
 threading.Thread(target=rates_updater, daemon=True).start()
 threading.Thread(target=monitor_news, daemon=True).start()
+threading.Thread(target=daily_scheduler, daemon=True).start()
 
 send(CHAT_ID,
     "✅ <b>Бот запущен!</b>\n"
     "📡 Курсы появятся в закрепе через 10 сек\n"
-    "🖼 Тематические фото по теме новости\n"
+    "🌅 Утренний обзор в 9:00\n"
+    "🌙 Вечерние итоги в 20:00\n"
+    "🗳 Опросы после обзоров\n"
     "Напиши /start"
 )
 

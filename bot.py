@@ -19,56 +19,48 @@ settings = {"auto_monitor": False}
 chat_history = {}
 seen_news = set()
 pinned_msg_id = None
+used_photo_ids = set()
 
-# Категории фото для Unsplash — каждый раз случайное фото по теме
-PHOTO_QUERIES = {
-    "bitcoin": ["bitcoin", "btc cryptocurrency", "bitcoin gold coin", "bitcoin mining", "crypto bitcoin"],
-    "ethereum": ["ethereum", "eth blockchain", "ethereum crypto", "digital currency", "crypto ethereum"],
-    "trading": ["stock trading", "financial charts", "trading screen", "market analysis", "forex trading"],
-    "bull": ["bull market", "growth chart", "financial success", "stock market up", "green chart"],
-    "bear": ["bear market", "financial crisis", "stock market crash", "red chart", "market down"],
-    "analyst": ["business analysis", "financial report", "data analytics", "expert analysis", "market research"],
-    "defi": ["defi blockchain", "decentralized finance", "smart contract", "web3", "blockchain network"],
-    "nft": ["digital art", "nft artwork", "metaverse", "virtual reality art", "digital collectible"],
-    "oil": ["oil refinery", "crude oil", "brent crude", "oil price", "petroleum industry"],
-    "regulation": ["government regulation", "law finance", "financial regulation", "crypto law", "compliance"],
-    "default": ["cryptocurrency", "blockchain technology", "crypto market", "digital finance", "fintech"]
+# Пулы ID фото по темам из Picsum (1-1000)
+PHOTO_POOLS = {
+    "bitcoin": [1, 20, 42, 65, 80, 100, 112, 130, 150, 175, 200, 220, 250, 280, 300],
+    "ethereum": [2, 21, 43, 66, 81, 101, 113, 131, 151, 176, 201, 221, 251, 281, 301],
+    "trading": [3, 22, 44, 67, 82, 102, 114, 132, 152, 177, 202, 222, 252, 282, 302],
+    "bull": [4, 23, 45, 68, 83, 103, 115, 133, 153, 178, 203, 223, 253, 283, 303],
+    "bear": [5, 24, 46, 69, 84, 104, 116, 134, 154, 179, 204, 224, 254, 284, 304],
+    "oil": [6, 25, 47, 70, 85, 105, 117, 135, 155, 180, 205, 225, 255, 285, 305],
+    "analyst": [7, 26, 48, 71, 86, 106, 118, 136, 156, 181, 206, 226, 256, 286, 306],
+    "default": list(range(10, 1000, 7))
 }
 
-def get_unsplash_image(query):
-    try:
-        seed = random.randint(1, 9999)
-        encoded = requests.utils.quote(query)
-        url = f"https://source.unsplash.com/1024x512/?{encoded}&sig={seed}"
-        return url
-    except:
-        return "https://images.unsplash.com/photo-1518544801976-3e159e50e5bb?w=1024"
-
 def get_image(title):
+    global used_photo_ids
+    if len(used_photo_ids) > 800:
+        used_photo_ids = set()
     t = title.lower()
     if "bitcoin" in t or "btc" in t:
-        query = random.choice(PHOTO_QUERIES["bitcoin"])
+        pool = PHOTO_POOLS["bitcoin"]
     elif "ethereum" in t or "eth" in t:
-        query = random.choice(PHOTO_QUERIES["ethereum"])
-    elif "oil" in t or "нефть" in t or "brent" in t or "crude" in t:
-        query = random.choice(PHOTO_QUERIES["oil"])
-    elif "nft" in t:
-        query = random.choice(PHOTO_QUERIES["nft"])
-    elif "defi" in t or "decentralized" in t:
-        query = random.choice(PHOTO_QUERIES["defi"])
-    elif "regulation" in t or "sec" in t or "ban" in t or "law" in t:
-        query = random.choice(PHOTO_QUERIES["regulation"])
-    elif "analyst" in t or "forecast" in t or "prediction" in t:
-        query = random.choice(PHOTO_QUERIES["analyst"])
-    elif "crash" in t or "drop" in t or "fall" in t or "bear" in t:
-        query = random.choice(PHOTO_QUERIES["bear"])
-    elif "rally" in t or "surge" in t or "bull" in t or "ath" in t:
-        query = random.choice(PHOTO_QUERIES["bull"])
-    elif "trading" in t or "trade" in t:
-        query = random.choice(PHOTO_QUERIES["trading"])
+        pool = PHOTO_POOLS["ethereum"]
+    elif "oil" in t or "нефть" in t or "brent" in t:
+        pool = PHOTO_POOLS["oil"]
+    elif "crash" in t or "drop" in t or "bear" in t:
+        pool = PHOTO_POOLS["bear"]
+    elif "rally" in t or "surge" in t or "bull" in t:
+        pool = PHOTO_POOLS["bull"]
+    elif "analyst" in t or "forecast" in t:
+        pool = PHOTO_POOLS["analyst"]
+    elif "trading" in t:
+        pool = PHOTO_POOLS["trading"]
     else:
-        query = random.choice(PHOTO_QUERIES["default"])
-    return get_unsplash_image(query)
+        pool = PHOTO_POOLS["default"]
+    available = [p for p in pool if p not in used_photo_ids]
+    if not available:
+        photo_id = random.randint(1, 999)
+    else:
+        photo_id = random.choice(available)
+    used_photo_ids.add(photo_id)
+    return f"https://picsum.photos/id/{photo_id}/1024/512"
 
 def send(chat, text, markup=None):
     data = {"chat_id": chat, "text": text, "parse_mode": "HTML"}
@@ -237,7 +229,6 @@ def rates_updater():
                     if msg_id:
                         pinned_msg_id = msg_id
                         pin_msg(CHANNEL, msg_id)
-                        print(f"Новый закреп: {msg_id}")
             else:
                 msg_id = send(CHANNEL, text)
                 if msg_id:
@@ -277,6 +268,9 @@ def classify_news(title):
             if category == "neutral":
                 category = "analyst"
     return category, score
+
+def normalize_title(title):
+    return " ".join(title.lower().split()[:5])
 
 def fetch_cryptopanic():
     news = []
@@ -327,7 +321,7 @@ def fetch_site(url, source, lang, tags=["h2", "h3"]):
         for tag_name in tags:
             for tag in soup.find_all(tag_name)[:8]:
                 t = tag.get_text().strip()
-                if len(t) > 20 and len(t) < 200:
+                if 20 < len(t) < 200:
                     news.append({"title": t, "source": source, "url": url, "lang": lang})
     except Exception as e:
         print(f"Site error {source}: {e}")
@@ -372,12 +366,13 @@ def fetch_all_news():
     ]
     for url, source, lang in rss_list:
         all_news.extend(fetch_rss(url, source, lang))
-    seen = set()
+    seen_titles = set()
     unique = []
     for item in all_news:
         nid = hashlib.md5(item["title"].encode()).hexdigest()
-        if nid not in seen:
-            seen.add(nid)
+        norm = normalize_title(item["title"])
+        if nid not in seen_news and norm not in seen_titles:
+            seen_titles.add(norm)
             category, score = classify_news(item["title"])
             if category is not None:
                 item["category"] = category
@@ -530,7 +525,7 @@ def handle_callback(cb):
     elif data.startswith("newimg_"):
         pid = data[7:]
         title = pending.get(pid, {}).get("title", "crypto")
-        new_img = get_image(title + str(random.randint(1, 9999)))
+        new_img = get_image(title + str(random.randint(1, 999)))
         if pid in pending:
             pending[pid]["img"] = new_img
         post = pending.get(pid, {}).get("post", "")
@@ -551,7 +546,8 @@ def handle(msg):
         send(chat,
             "👋 <b>Crypto AI Bot</b>\n\n"
             "📡 Курсы в закрепе — каждые 2 минуты\n"
-            "🖼 Фото — миллионы уникальных через Unsplash\n\n"
+            "🖼 1000+ уникальных фото\n"
+            "🔄 Дубли новостей исключены\n\n"
             "📰 15+ источников:\n"
             "🇺🇸 CryptoPanic, CoinDesk, CoinTelegraph,\n"
             "Decrypt, U.Today, BeInCrypto, Bitcoin.com,\n"
@@ -604,8 +600,8 @@ threading.Thread(target=monitor_news, daemon=True).start()
 send(CHAT_ID,
     "✅ <b>Бот запущен!</b>\n"
     "📡 Курсы появятся в закрепе через 10 сек\n"
-    "🖼 Миллионы уникальных фото\n"
-    "⏱ Мониторинг каждые 30 минут\n"
+    "🖼 1000+ уникальных фото через Picsum\n"
+    "🔄 Дубли исключены\n"
     "Напиши /start"
 )
 

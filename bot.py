@@ -1,4 +1,4 @@
-import os
+        import os
 import requests
 import time
 import threading
@@ -31,67 +31,49 @@ CRYPTO_IMAGES = [
     "https://images.unsplash.com/photo-1630926854574-977b8e04c58c?w=1024",
 ]
 
-# 20 источников — США, Россия, СНГ, мировые
 RSS_SOURCES = [
-    # США и мировые
     ("https://www.coindesk.com/arc/outboundfeeds/rss/", "CoinDesk"),
     ("https://cointelegraph.com/rss", "CoinTelegraph"),
     ("https://decrypt.co/feed", "Decrypt"),
-    ("https://bitcoinmagazine.com/feed", "Bitcoin Magazine"),
-    ("https://crypto.news/feed/", "Crypto.News"),
-    ("https://newsbtc.com/feed/", "NewsBTC"),
     ("https://news.bitcoin.com/feed/", "Bitcoin.com"),
     ("https://cryptoslate.com/feed/", "CryptoSlate"),
     ("https://u.today/rss", "U.Today"),
-    ("https://blockworks.co/feed", "Blockworks"),
     ("https://beincrypto.com/feed/", "BeInCrypto"),
-    ("https://coingape.com/feed/", "CoinGape"),
     ("https://ambcrypto.com/feed/", "AMBCrypto"),
     ("https://cryptopotato.com/feed/", "CryptoPotato"),
-    ("https://thedefiant.io/feed", "The Defiant"),
-    # Русскоязычные и СНГ
-    ("https://bits.media/rss/news/", "Bits.Media"),
     ("https://forklog.com/feed/", "ForkLog"),
-    ("https://incrypted.com/feed/", "Incrypted"),
-    ("https://coinspot.io/feed/", "CoinSpot"),
+    ("https://bits.media/rss/news/", "Bits.Media"),
     ("https://cryptopanic.com/news/rss/", "CryptoPanic"),
 ]
 
-# Расширенные фильтры
 BULLISH_KEYWORDS = [
     "rally", "surge", "pump", "bull", "growth", "adoption", "partnership",
     "launch", "upgrade", "listing", "etf", "approval", "investment",
-    "institutional", "record", "all-time high", "ath", "breakthrough",
-    "рост", "ралли", "инвестиции", "листинг", "одобрение", "партнёрство"
+    "record", "all-time high", "ath", "breakthrough", "rises", "gains",
+    "рост", "ралли", "инвестиции", "листинг", "одобрение", "партнёрство", "растёт"
 ]
 
 BEARISH_KEYWORDS = [
     "crash", "drop", "fall", "bear", "hack", "exploit", "ban", "regulation",
-    "sec", "lawsuit", "bankruptcy", "fraud", "scam", "decline", "sell-off",
-    "падение", "обвал", "взлом", "запрет", "регуляция", "банкротство"
+    "sec", "lawsuit", "bankruptcy", "fraud", "decline", "sell-off", "plunges",
+    "падение", "обвал", "взлом", "запрет", "регуляция", "банкротство", "падает"
 ]
 
 ANALYST_KEYWORDS = [
     "analyst", "expert", "forecast", "prediction", "according to",
-    "report", "research", "study", "аналитик", "эксперт", "прогноз",
-    "исследование", "мнение", "оценка"
+    "report", "research", "аналитик", "эксперт", "прогноз", "мнение"
 ]
 
 SPAM_KEYWORDS = [
-    "sponsored", "advertisement", "casino", "gambling", "giveaway",
-    "earn money fast", "get rich quick", "100x guaranteed"
+    "sponsored", "advertisement", "casino", "gambling", "giveaway", "get rich"
 ]
 
 def get_image(title):
-    title_lower = title.lower()
-    if "bitcoin" in title_lower or "btc" in title_lower:
+    t = title.lower()
+    if "bitcoin" in t or "btc" in t:
         return CRYPTO_IMAGES[0]
-    elif "ethereum" in title_lower or "eth" in title_lower:
+    elif "ethereum" in t or "eth" in t:
         return CRYPTO_IMAGES[1]
-    elif "nft" in title_lower:
-        return CRYPTO_IMAGES[3]
-    elif "defi" in title_lower:
-        return CRYPTO_IMAGES[4]
     else:
         return random.choice(CRYPTO_IMAGES)
 
@@ -101,33 +83,28 @@ def send(chat, text, markup=None):
         data["reply_markup"] = markup
     try:
         r = requests.post(API + "/sendMessage", json=data, timeout=10)
-        result = r.json().get("result", {})
-        return result.get("message_id")
+        return r.json().get("result", {}).get("message_id")
     except:
         return None
 
 def edit_msg(chat, msg_id, text):
     try:
-        requests.post(API + "/editMessageText", json={
-            "chat_id": chat,
-            "message_id": msg_id,
-            "text": text,
-            "parse_mode": "HTML"
+        r = requests.post(API + "/editMessageText", json={
+            "chat_id": chat, "message_id": msg_id,
+            "text": text, "parse_mode": "HTML"
         }, timeout=10)
-        return True
+        return r.json().get("ok", False)
     except:
         return False
 
 def pin_msg(chat, msg_id):
     try:
         requests.post(API + "/pinChatMessage", json={
-            "chat_id": chat,
-            "message_id": msg_id,
+            "chat_id": chat, "message_id": msg_id,
             "disable_notification": True
         }, timeout=10)
-        return True
     except:
-        return False
+        pass
 
 def send_photo(chat, photo_url, caption="", markup=None):
     data = {"chat_id": chat, "photo": photo_url, "caption": caption, "parse_mode": "HTML"}
@@ -150,20 +127,6 @@ def ai(messages):
         return r.json()["choices"][0]["message"]["content"]
     except Exception as e:
         return "AI недоступен: " + str(e)
-
-def translate_and_write(title, source, article_text=""):
-    if article_text:
-        content = f"Заголовок: {title}\nИсточник: {source}\n\nТекст статьи:\n{article_text[:2000]}"
-    else:
-        content = f"Заголовок: {title}\nИсточник: {source}"
-    return ai([
-        {"role": "system", "content": """Ты крипто эксперт и автор Telegram канала @cryptoainovosti.
-Если текст на английском — переведи и перепиши как интересный пост на русском языке.
-Используй эмодзи. 150-200 слов.
-Если новость про рост — добавь 📈, если про падение — 📉, если мнение аналитика — 🔍.
-В конце укажи источник."""},
-        {"role": "user", "content": content}
-    ])
 
 def get_crypto_prices():
     prices = {}
@@ -223,59 +186,45 @@ def format_rates():
     cbr = get_cbr_rates()
     brent = get_brent_price()
     now = datetime.now().strftime("%d.%m.%Y · %H:%M")
-
-    lines = ["╔════════════════════╗"]
-    lines.append("         📡 LIVE RATES")
-    lines.append("╚════════════════════╝\n")
-
-    symbols_map = [
-        ("BTCUSDT", "🟡 BTC", "$"),
-        ("ETHUSDT", "🔵 ETH", "$"),
-        ("BNBUSDT", "🟠 BNB", "$"),
-        ("SOLUSDT", "🟣 SOL", "$"),
-        ("XRPUSDT", "🔵 XRP", "$"),
+    lines = [
+        "╔════════════════════╗",
+        "         📡 LIVE RATES",
+        "╚════════════════════╝\n"
     ]
-
-    for sym, label, currency in symbols_map:
+    for sym, label in [
+        ("BTCUSDT", "🟡 BTC"),
+        ("ETHUSDT", "🔵 ETH"),
+        ("BNBUSDT", "🟠 BNB"),
+        ("SOLUSDT", "🟣 SOL"),
+        ("XRPUSDT", "🔵 XRP"),
+    ]:
         if sym in crypto:
             p = crypto[sym]["price"]
             c = crypto[sym]["change"]
             a = arrow(c)
             sign = "+" if c >= 0 else ""
             price_str = f"{p:,.2f}" if p > 1 else f"{p:.4f}"
-            lines.append(f"{label}    {currency}{price_str}   {a} {sign}{c:.1f}%")
-
+            lines.append(f"{label}    ${price_str}   {a} {sign}{c:.1f}%")
     lines.append("\n─────────────────────")
-
     if "USD" in cbr:
         lines.append(f"💵 USD   {cbr['USD']:.2f} ₽")
     if "EUR" in cbr:
         lines.append(f"💶 EUR   {cbr['EUR']:.2f} ₽")
-
     if brent:
         p = brent["price"]
         c = brent["change"]
         a = arrow(c)
         sign = "+" if c >= 0 else ""
         lines.append(f"🛢 BRENT   ${p:.2f}   {a} {sign}{c:.1f}%")
-
     lines.append("\n─────────────────────")
     lines.append(f"🕐 {now}")
     lines.append(f"📌 @cryptoainovosti")
-
     return "\n".join(lines)
 
 def rates_updater():
     global pinned_msg_id
-    time.sleep(15)
-    text = format_rates()
-    msg_id = send(CHANNEL, text)
-    if msg_id:
-        pinned_msg_id = msg_id
-        pin_msg(CHANNEL, msg_id)
-        print(f"Курсы опубликованы и закреплены, msg_id={msg_id}")
+    time.sleep(10)
     while True:
-        time.sleep(60)
         try:
             text = format_rates()
             if pinned_msg_id:
@@ -285,13 +234,16 @@ def rates_updater():
                     if msg_id:
                         pinned_msg_id = msg_id
                         pin_msg(CHANNEL, msg_id)
+                        print(f"Новый закреп: {msg_id}")
             else:
                 msg_id = send(CHANNEL, text)
                 if msg_id:
                     pinned_msg_id = msg_id
                     pin_msg(CHANNEL, msg_id)
+                    print(f"Курсы закреплены: {msg_id}")
         except Exception as e:
             print("Ошибка курсов:", e)
+        time.sleep(60)
 
 def classify_news(title):
     t = title.lower()
@@ -311,18 +263,19 @@ def classify_news(title):
     for w in ANALYST_KEYWORDS:
         if w in t:
             score += 1
-            category = "analyst"
+            if category == "neutral":
+                category = "analyst"
     return category, score
 
 def fetch_article_text(url):
     try:
-        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
         soup = BeautifulSoup(r.text, "html.parser")
         for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
             tag.decompose()
         paragraphs = soup.find_all("p")
         text = " ".join([p.get_text().strip() for p in paragraphs if len(p.get_text().strip()) > 50])
-        return text[:2500]
+        return text[:2000]
     except:
         return ""
 
@@ -330,15 +283,25 @@ def fetch_all_news():
     news = []
     for rss_url, source in RSS_SOURCES:
         try:
-            r = requests.get(rss_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-            soup = BeautifulSoup(r.text, "xml")
-            for item in soup.find_all("item")[:5]:
+            r = requests.get(rss_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=8)
+            soup = BeautifulSoup(r.content, "xml")
+            items = soup.find_all("item")
+            if not items:
+                soup = BeautifulSoup(r.content, "html.parser")
+                items = soup.find_all("item")
+            for item in items[:4]:
                 title_tag = item.find("title")
                 link_tag = item.find("link")
                 if not title_tag:
                     continue
                 t = title_tag.get_text().strip()
-                u = link_tag.get_text().strip() if link_tag else ""
+                if not t or len(t) < 15:
+                    continue
+                u = ""
+                if link_tag:
+                    u = link_tag.get_text().strip()
+                    if not u:
+                        u = link_tag.get("href", "")
                 category, score = classify_news(t)
                 if category is not None:
                     news.append({
@@ -349,10 +312,21 @@ def fetch_all_news():
                         "score": score,
                         "id": hashlib.md5(t.encode()).hexdigest()
                     })
-        except:
+        except Exception as e:
+            print(f"Ошибка {source}: {e}")
             continue
     news.sort(key=lambda x: x["score"], reverse=True)
     return news
+
+def write_post(title, source, article_text=""):
+    if article_text:
+        content = f"Заголовок: {title}\nИсточник: {source}\n\nТекст:\n{article_text}"
+    else:
+        content = f"Заголовок: {title}\nИсточник: {source}"
+    return ai([
+        {"role": "system", "content": "Ты крипто эксперт канала @cryptoainovosti. Если текст на английском — переведи. Напиши интересный пост на русском. Используй эмодзи. 150-200 слов. Укажи источник в конце."},
+        {"role": "user", "content": content}
+    ])
 
 def prepare_and_send(chat, item):
     title = item["title"]
@@ -360,7 +334,6 @@ def prepare_and_send(chat, item):
     url = item.get("url", "")
     category = item.get("category", "neutral")
     score = item.get("score", 0)
-
     if category == "bull":
         icon = "📈"
         label = "Потенциальный рост"
@@ -373,16 +346,13 @@ def prepare_and_send(chat, item):
     else:
         icon = "📰"
         label = "Новость"
-
     priority = "🔴 Срочно" if score >= 3 else "🟡 Важно"
-    send(chat, f"{priority} | {icon} <b>{label}</b>\n📌 {source}\n\n<i>{title}</i>\n\n✍️ Читаю статью и перевожу...")
-
+    send(chat, f"{priority} | {icon} <b>{label}</b>\n📌 {source}\n\n<i>{title}</i>\n\n✍️ Готовлю пост...")
     article_text = fetch_article_text(url) if url else ""
-    post = translate_and_write(title, source, article_text)
+    post = write_post(title, source, article_text)
     img_url = get_image(title)
     pid = str(int(time.time()))
     pending[pid] = {"post": post, "img": img_url, "title": title}
-
     markup = {"inline_keyboard": [[
         {"text": "✅ Опубликовать", "callback_data": "ok_" + pid},
         {"text": "❌ Отклонить", "callback_data": "no_" + pid},
@@ -398,10 +368,10 @@ def publish(chat, post, img_url=None):
     if img_url:
         ok = send_photo(CHANNEL, img_url, post)
         if ok:
-            send(chat, "✅ <b>Пост с фото опубликован в</b> @cryptoainovosti!")
+            send(chat, "✅ Пост с фото опубликован в @cryptoainovosti!")
             return
     send(CHANNEL, post)
-    send(chat, "✅ <b>Пост опубликован в</b> @cryptoainovosti!")
+    send(chat, "✅ Пост опубликован в @cryptoainovosti!")
 
 def assistant(chat, text):
     if chat not in chat_history:
@@ -409,10 +379,7 @@ def assistant(chat, text):
     chat_history[chat].append({"role": "user", "content": text})
     if len(chat_history[chat]) > 10:
         chat_history[chat] = chat_history[chat][-10:]
-    system = """Ты главный AI ассистент крипто канала @cryptoainovosti.
-Следишь за 20 источниками новостей. Показываешь курсы в реальном времени.
-Анализируешь рынок — рост, падение, мнения аналитиков.
-Отвечай на русском языке, используй эмодзи. Будь профессиональным."""
+    system = "Ты главный AI ассистент крипто канала @cryptoainovosti. Отвечай на русском, используй эмодзи."
     messages = [{"role": "system", "content": system}] + chat_history[chat]
     response = ai(messages)
     chat_history[chat].append({"role": "assistant", "content": response})
@@ -432,6 +399,8 @@ def monitor_news():
                         time.sleep(20)
                         if new_count >= 5:
                             break
+                if new_count == 0:
+                    print("Новых новостей нет")
             except Exception as e:
                 print("Ошибка мониторинга:", e)
         time.sleep(300)
@@ -457,7 +426,7 @@ def handle_callback(cb):
         pid = data[5:]
         send(chat, "🔄 Переписываю...")
         title = pending.get(pid, {}).get("title", "crypto")
-        post = translate_and_write(title, "", "")
+        post = write_post(title, "", "")
         img_url = pending.get(pid, {}).get("img")
         if pid in pending:
             pending[pid]["post"] = post
@@ -493,62 +462,43 @@ def handle(msg):
     if text == "/start":
         send(chat,
             "👋 <b>Crypto AI Bot</b>\n\n"
-            "🤖 Твой умный крипто ассистент!\n\n"
-            "📡 Курсы в канале обновляются каждую минуту\n\n"
-            "📰 20 источников новостей:\n"
-            "🇺🇸 CoinDesk, CoinTelegraph, Decrypt,\n"
-            "Bitcoin Magazine, NewsBTC, Blockworks,\n"
-            "BeInCrypto, CryptoSlate, The Defiant...\n"
-            "🇷🇺 ForkLog, Bits.Media, Incrypted,\n"
-            "CoinSpot, CryptoPanic...\n\n"
-            "Фильтры:\n"
-            "📈 Потенциальный рост\n"
-            "📉 Потенциальное падение\n"
-            "🔍 Мнения аналитиков\n\n"
+            "📡 Курсы в канале — каждую минуту\n"
+            "📰 12 источников новостей\n\n"
             "Команды:\n"
             "/monitor — мониторинг новостей\n"
             "/stop — выключить\n"
             "/scan — разовая проверка\n"
             "/news — свежие новости\n"
-            "/rates — курсы прямо сейчас\n\n"
+            "/rates — курсы\n\n"
             "💬 Или напиши мне что угодно!"
         )
     elif text == "/monitor":
         settings["auto_monitor"] = True
         seen_news.clear()
-        send(chat,
-            "✅ <b>Мониторинг включён!</b>\n\n"
-            "📈 Рост · 📉 Падение · 🔍 Аналитика\n"
-            "Проверка каждые 5 минут · 20 источников"
-        )
+        send(chat, "✅ <b>Мониторинг включён!</b>\nПроверка каждые 5 минут · 12 источников")
     elif text == "/stop":
         settings["auto_monitor"] = False
         send(chat, "⏹ Мониторинг выключен")
     elif text == "/scan":
-        send(chat, "🔍 Сканирую 20 источников...")
+        send(chat, "🔍 Сканирую источники...")
         news = fetch_all_news()
         if news:
             prepare_and_send(chat, news[0])
         else:
-            send(chat, "❌ Важных новостей не найдено")
+            send(chat, "❌ Новостей не найдено — попробуй позже")
     elif text == "/news":
         send(chat, "🔍 Загружаю новости...")
         news = fetch_all_news()
+        if not news:
+            send(chat, "❌ Новостей не найдено — попробуй позже")
+            return
         msg2 = "📰 <b>Свежие новости:</b>\n\n"
         for n in news[:10]:
-            if n["category"] == "bull":
-                icon = "📈"
-            elif n["category"] == "bear":
-                icon = "📉"
-            elif n["category"] == "analyst":
-                icon = "🔍"
-            else:
-                icon = "📰"
+            icon = "📈" if n["category"] == "bull" else "📉" if n["category"] == "bear" else "🔍" if n["category"] == "analyst" else "📰"
             priority = "🔴" if n["score"] >= 3 else "🟡"
             msg2 += f"{priority}{icon} {n['title']}\n📌 {n['source']}\n\n"
         send(chat, msg2)
     elif text == "/rates":
-        send(chat, "📡 Загружаю курсы...")
         send(chat, format_rates())
     else:
         assistant(chat, text)
@@ -556,12 +506,7 @@ def handle(msg):
 threading.Thread(target=rates_updater, daemon=True).start()
 threading.Thread(target=monitor_news, daemon=True).start()
 
-send(CHAT_ID,
-    "✅ <b>Crypto AI Bot запущен!</b>\n\n"
-    "📡 Курсы появятся в канале через 15 секунд\n"
-    "📰 20 источников новостей готовы\n"
-    "Напиши /start для начала!"
-)
+send(CHAT_ID, "✅ <b>Бот запущен!</b>\n📡 Курсы появятся в канале через 10 сек\nНапиши /start")
 
 offset = 0
 print("Бот запущен!")

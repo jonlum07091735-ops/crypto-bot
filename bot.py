@@ -19,48 +19,134 @@ settings = {"auto_monitor": False}
 chat_history = {}
 seen_news = set()
 pinned_msg_id = None
-used_photo_ids = set()
 
-# Пулы ID фото по темам из Picsum (1-1000)
-PHOTO_POOLS = {
-    "bitcoin": [1, 20, 42, 65, 80, 100, 112, 130, 150, 175, 200, 220, 250, 280, 300],
-    "ethereum": [2, 21, 43, 66, 81, 101, 113, 131, 151, 176, 201, 221, 251, 281, 301],
-    "trading": [3, 22, 44, 67, 82, 102, 114, 132, 152, 177, 202, 222, 252, 282, 302],
-    "bull": [4, 23, 45, 68, 83, 103, 115, 133, 153, 178, 203, 223, 253, 283, 303],
-    "bear": [5, 24, 46, 69, 84, 104, 116, 134, 154, 179, 204, 224, 254, 284, 304],
-    "oil": [6, 25, 47, 70, 85, 105, 117, 135, 155, 180, 205, 225, 255, 285, 305],
-    "analyst": [7, 26, 48, 71, 86, 106, 118, 136, 156, 181, 206, 226, 256, 286, 306],
-    "default": list(range(10, 1000, 7))
+# Тематические фото по категориям — реальные Unsplash фото по конкретным темам
+THEMED_PHOTOS = {
+    "bitcoin": [
+        "https://images.unsplash.com/photo-1518544801976-3e159e50e5bb?w=1024&q=80",
+        "https://images.unsplash.com/photo-1561622539-a6fe1b7e3ab6?w=1024&q=80",
+        "https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=1024&q=80",
+        "https://images.unsplash.com/photo-1591994843349-f415893b3a6b?w=1024&q=80",
+        "https://images.unsplash.com/photo-1629339942248-45d4b10c8c2f?w=1024&q=80",
+        "https://images.unsplash.com/photo-1609554496796-c345a5335ceb?w=1024&q=80",
+        "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1024&q=80",
+        "https://images.unsplash.com/photo-1640340434855-6084b1f4901c?w=1024&q=80",
+    ],
+    "ethereum": [
+        "https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=1024&q=80",
+        "https://images.unsplash.com/photo-1622630998477-20aa696ecb05?w=1024&q=80",
+        "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=1024&q=80",
+        "https://images.unsplash.com/photo-1643101681604-f98a4b57b9f3?w=1024&q=80",
+        "https://images.unsplash.com/photo-1644143379190-08a5f055de1d?w=1024&q=80",
+        "https://images.unsplash.com/photo-1645731904636-24bb2c4b1e5f?w=1024&q=80",
+    ],
+    "trading": [
+        "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1024&q=80",
+        "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1024&q=80",
+        "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1024&q=80",
+        "https://images.unsplash.com/photo-1535320903710-d993d3d77d29?w=1024&q=80",
+        "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1024&q=80",
+        "https://images.unsplash.com/photo-1563986768494-4dee2763ff3f?w=1024&q=80",
+        "https://images.unsplash.com/photo-1569025743873-ea3a9ade89f9?w=1024&q=80",
+        "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=1024&q=80",
+    ],
+    "bull": [
+        "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1024&q=80",
+        "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1024&q=80",
+        "https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=1024&q=80",
+        "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1024&q=80",
+        "https://images.unsplash.com/photo-1642790106117-e829e14a795f?w=1024&q=80",
+        "https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?w=1024&q=80",
+    ],
+    "bear": [
+        "https://images.unsplash.com/photo-1535320903710-d993d3d77d29?w=1024&q=80",
+        "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1024&q=80",
+        "https://images.unsplash.com/photo-1607863680198-23d4b2565df0?w=1024&q=80",
+        "https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?w=1024&q=80",
+        "https://images.unsplash.com/photo-1574607383476-f517f260d30b?w=1024&q=80",
+    ],
+    "oil": [
+        "https://images.unsplash.com/photo-1498354178607-a79df2916198?w=1024&q=80",
+        "https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=1024&q=80",
+        "https://images.unsplash.com/photo-1611270629569-8b357cb88da9?w=1024&q=80",
+        "https://images.unsplash.com/photo-1535637603896-07c179d71103?w=1024&q=80",
+        "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1024&q=80",
+    ],
+    "regulation": [
+        "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1024&q=80",
+        "https://images.unsplash.com/photo-1554469384-e58fac16e23a?w=1024&q=80",
+        "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1024&q=80",
+        "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1024&q=80",
+    ],
+    "defi": [
+        "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=1024&q=80",
+        "https://images.unsplash.com/photo-1644143379190-08a5f055de1d?w=1024&q=80",
+        "https://images.unsplash.com/photo-1523961131990-5ea7c61b2107?w=1024&q=80",
+        "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=1024&q=80",
+    ],
+    "nft": [
+        "https://images.unsplash.com/photo-1645378999496-33700b60e62d?w=1024&q=80",
+        "https://images.unsplash.com/photo-1646803194571-e8e2a1c8e21d?w=1024&q=80",
+        "https://images.unsplash.com/photo-1647427060118-4911c9821b82?w=1024&q=80",
+        "https://images.unsplash.com/photo-1648318513261-c37ea6e7b8aa?w=1024&q=80",
+    ],
+    "analyst": [
+        "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1024&q=80",
+        "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1024&q=80",
+        "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1024&q=80",
+        "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=1024&q=80",
+        "https://images.unsplash.com/photo-1563986768494-4dee2763ff3f?w=1024&q=80",
+    ],
+    "default": [
+        "https://images.unsplash.com/photo-1605792657660-596af9009e82?w=1024&q=80",
+        "https://images.unsplash.com/photo-1592483648228-b35146a4330c?w=1024&q=80",
+        "https://images.unsplash.com/photo-1630926854574-977b8e04c58c?w=1024&q=80",
+        "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=1024&q=80",
+        "https://images.unsplash.com/photo-1523961131990-5ea7c61b2107?w=1024&q=80",
+        "https://images.unsplash.com/photo-1569025743873-ea3a9ade89f9?w=1024&q=80",
+        "https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=1024&q=80",
+        "https://images.unsplash.com/photo-1607863680198-23d4b2565df0?w=1024&q=80",
+        "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1024&q=80",
+        "https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?w=1024&q=80",
+    ]
 }
 
+used_photos = {}
+
 def get_image(title):
-    global used_photo_ids
-    if len(used_photo_ids) > 800:
-        used_photo_ids = set()
     t = title.lower()
     if "bitcoin" in t or "btc" in t:
-        pool = PHOTO_POOLS["bitcoin"]
+        category = "bitcoin"
     elif "ethereum" in t or "eth" in t:
-        pool = PHOTO_POOLS["ethereum"]
-    elif "oil" in t or "нефть" in t or "brent" in t:
-        pool = PHOTO_POOLS["oil"]
-    elif "crash" in t or "drop" in t or "bear" in t:
-        pool = PHOTO_POOLS["bear"]
-    elif "rally" in t or "surge" in t or "bull" in t:
-        pool = PHOTO_POOLS["bull"]
-    elif "analyst" in t or "forecast" in t:
-        pool = PHOTO_POOLS["analyst"]
-    elif "trading" in t:
-        pool = PHOTO_POOLS["trading"]
+        category = "ethereum"
+    elif "oil" in t or "нефть" in t or "brent" in t or "crude" in t:
+        category = "oil"
+    elif "nft" in t:
+        category = "nft"
+    elif "defi" in t or "decentralized" in t:
+        category = "defi"
+    elif "regulation" in t or "sec" in t or "ban" in t or "law" in t or "регул" in t:
+        category = "regulation"
+    elif "crash" in t or "drop" in t or "bear" in t or "падение" in t or "обвал" in t:
+        category = "bear"
+    elif "rally" in t or "surge" in t or "bull" in t or "ath" in t or "рост" in t:
+        category = "bull"
+    elif "analyst" in t or "forecast" in t or "аналитик" in t or "прогноз" in t:
+        category = "analyst"
+    elif "trading" in t or "trade" in t:
+        category = "trading"
     else:
-        pool = PHOTO_POOLS["default"]
-    available = [p for p in pool if p not in used_photo_ids]
+        category = "default"
+    pool = THEMED_PHOTOS[category]
+    if category not in used_photos:
+        used_photos[category] = []
+    available = [p for p in pool if p not in used_photos[category]]
     if not available:
-        photo_id = random.randint(1, 999)
-    else:
-        photo_id = random.choice(available)
-    used_photo_ids.add(photo_id)
-    return f"https://picsum.photos/id/{photo_id}/1024/512"
+        used_photos[category] = []
+        available = pool
+    img = random.choice(available)
+    used_photos[category].append(img)
+    return img
 
 def send(chat, text, markup=None):
     data = {"chat_id": chat, "text": text, "parse_mode": "HTML"}
@@ -75,10 +161,8 @@ def send(chat, text, markup=None):
 def edit_msg(chat, msg_id, text):
     try:
         r = requests.post(API + "/editMessageText", json={
-            "chat_id": chat,
-            "message_id": msg_id,
-            "text": text,
-            "parse_mode": "HTML"
+            "chat_id": chat, "message_id": msg_id,
+            "text": text, "parse_mode": "HTML"
         }, timeout=10)
         return r.json().get("ok", False)
     except:
@@ -87,8 +171,7 @@ def edit_msg(chat, msg_id, text):
 def pin_msg(chat, msg_id):
     try:
         requests.post(API + "/pinChatMessage", json={
-            "chat_id": chat,
-            "message_id": msg_id,
+            "chat_id": chat, "message_id": msg_id,
             "disable_notification": True
         }, timeout=10)
     except:
@@ -435,7 +518,7 @@ def prepare_and_send(chat, item):
     post = write_post(title, source, article_text, lang)
     img_url = get_image(title)
     pid = str(int(time.time()))
-    pending[pid] = {"post": post, "img": img_url, "title": title}
+    pending[pid] = {"post": post, "img": img_url, "title": title, "category": category}
     markup = {"inline_keyboard": [[
         {"text": "✅ Опубликовать", "callback_data": "ok_" + pid},
         {"text": "❌ Отклонить", "callback_data": "no_" + pid},
@@ -525,7 +608,7 @@ def handle_callback(cb):
     elif data.startswith("newimg_"):
         pid = data[7:]
         title = pending.get(pid, {}).get("title", "crypto")
-        new_img = get_image(title + str(random.randint(1, 999)))
+        new_img = get_image(title)
         if pid in pending:
             pending[pid]["img"] = new_img
         post = pending.get(pid, {}).get("post", "")
@@ -546,14 +629,9 @@ def handle(msg):
         send(chat,
             "👋 <b>Crypto AI Bot</b>\n\n"
             "📡 Курсы в закрепе — каждые 2 минуты\n"
-            "🖼 1000+ уникальных фото\n"
-            "🔄 Дубли новостей исключены\n\n"
-            "📰 15+ источников:\n"
-            "🇺🇸 CryptoPanic, CoinDesk, CoinTelegraph,\n"
-            "Decrypt, U.Today, BeInCrypto, Bitcoin.com,\n"
-            "Medium, AMBCrypto, CryptoPotato\n"
-            "🇷🇺 ForkLog, Bits.Media, Incrypted\n"
-            "🛢 Yahoo Finance Oil\n\n"
+            "🖼 Тематические фото по теме новости\n"
+            "🔄 Дубли исключены\n\n"
+            "📰 15+ источников новостей\n"
             "Команды:\n"
             "/monitor — мониторинг каждые 30 мин\n"
             "/stop — выключить\n"
@@ -565,7 +643,7 @@ def handle(msg):
     elif text == "/monitor":
         settings["auto_monitor"] = True
         seen_news.clear()
-        send(chat, "✅ <b>Мониторинг включён!</b>\nПроверка каждые 30 минут · 15+ источников")
+        send(chat, "✅ <b>Мониторинг включён!</b>\nПроверка каждые 30 минут")
     elif text == "/stop":
         settings["auto_monitor"] = False
         send(chat, "⏹ Мониторинг выключен")
@@ -600,8 +678,7 @@ threading.Thread(target=monitor_news, daemon=True).start()
 send(CHAT_ID,
     "✅ <b>Бот запущен!</b>\n"
     "📡 Курсы появятся в закрепе через 10 сек\n"
-    "🖼 1000+ уникальных фото через Picsum\n"
-    "🔄 Дубли исключены\n"
+    "🖼 Тематические фото по теме новости\n"
     "Напиши /start"
 )
 

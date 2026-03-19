@@ -255,12 +255,7 @@ def format_rates():
     crypto = get_crypto_prices()
     cbr = get_cbr_rates()
     brent = get_brent()
-    now = datetime.now().strftime("%d.%m.%Y · %H:%M")
-    lines = [
-        "╔════════════════════╗",
-        "         📡 LIVE RATES",
-        "╚════════════════════╝\n"
-    ]
+    lines = ["📡 <b>LIVE RATES</b>\n"]
     for sym, label in [
         ("BTCUSDT", "🟡 BTC"),
         ("ETHUSDT", "🔵 ETH"),
@@ -274,21 +269,18 @@ def format_rates():
             a = arrow(c)
             sign = "+" if c >= 0 else ""
             price_str = f"{p:,.2f}" if p > 1 else f"{p:.4f}"
-            lines.append(f"{label}    ${price_str}   {a} {sign}{c:.1f}%")
-    lines.append("\n─────────────────────")
+            lines.append(f"{label}  ${price_str}  {a} {sign}{c:.1f}%")
+    lines.append("")
     if "USD" in cbr:
-        lines.append(f"💵 USD   {cbr['USD']:.2f} ₽")
+        lines.append(f"💵 USD  {cbr['USD']:.2f} ₽")
     if "EUR" in cbr:
-        lines.append(f"💶 EUR   {cbr['EUR']:.2f} ₽")
+        lines.append(f"💶 EUR  {cbr['EUR']:.2f} ₽")
     if brent:
         p = brent["price"]
         c = brent["change"]
         a = arrow(c)
         sign = "+" if c >= 0 else ""
-        lines.append(f"🛢 BRENT   ${p:.2f}   {a} {sign}{c:.1f}%")
-    lines.append("\n─────────────────────")
-    lines.append(f"🕐 {now}")
-    lines.append(f"📌 @cryptoainovosti")
+        lines.append(f"🛢 BRENT  ${p:.2f}  {a} {sign}{c:.1f}%")
     return "\n".join(lines)
 
 def get_pinned_msg_id():
@@ -305,8 +297,7 @@ def rates_updater():
     pinned_msg_id = get_pinned_msg_id()
     print(f"Найден закреп: {pinned_msg_id}")
     if not pinned_msg_id:
-        text = format_rates()
-        msg_id = send(CHANNEL, text)
+        msg_id = send(CHANNEL, format_rates())
         if msg_id:
             pinned_msg_id = msg_id
             pin_msg(CHANNEL, msg_id)
@@ -316,12 +307,10 @@ def rates_updater():
             text = format_rates()
             if pinned_msg_id:
                 ok = edit_msg(CHANNEL, pinned_msg_id, text)
-                print(f"Курсы обновлены ok={ok} msg_id={pinned_msg_id}")
+                print(f"Обновлено: {ok} id={pinned_msg_id}")
                 if not ok:
                     pinned_msg_id = get_pinned_msg_id()
-                    if pinned_msg_id:
-                        edit_msg(CHANNEL, pinned_msg_id, text)
-                    else:
+                    if not pinned_msg_id:
                         msg_id = send(CHANNEL, text)
                         if msg_id:
                             pinned_msg_id = msg_id
@@ -333,7 +322,7 @@ def rates_updater():
                     pin_msg(CHANNEL, msg_id)
         except Exception as e:
             print("Ошибка курсов:", e)
-        time.sleep(120)
+        time.sleep(60)
 
 def classify_news(title):
     t = title.lower()

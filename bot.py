@@ -291,51 +291,46 @@ def format_rates():
     lines.append(f"📌 @cryptoainovosti")
     return "\n".join(lines)
 
-def save_pin_id(msg_id):
+def get_pinned_msg_id():
     try:
-        with open("/tmp/pin_id.txt", "w") as f:
-            f.write(str(msg_id))
-    except:
-        pass
-
-def load_pin_id():
-    try:
-        with open("/tmp/pin_id.txt", "r") as f:
-            return int(f.read().strip())
+        r = requests.get(API + "/getChat", json={"chat_id": CHANNEL}, timeout=10)
+        pinned = r.json().get("result", {}).get("pinned_message", {})
+        return pinned.get("message_id")
     except:
         return None
 
 def rates_updater():
     global pinned_msg_id
-    pinned_msg_id = load_pin_id()
-    time.sleep(10)
+    time.sleep(15)
+    pinned_msg_id = get_pinned_msg_id()
+    print(f"Найден закреп: {pinned_msg_id}")
     if not pinned_msg_id:
         text = format_rates()
         msg_id = send(CHANNEL, text)
         if msg_id:
             pinned_msg_id = msg_id
             pin_msg(CHANNEL, msg_id)
-            save_pin_id(msg_id)
             print(f"Закреп создан: {msg_id}")
     while True:
         try:
             text = format_rates()
             if pinned_msg_id:
                 ok = edit_msg(CHANNEL, pinned_msg_id, text)
-                print(f"Курсы обновлены: {ok}")
+                print(f"Курсы обновлены ok={ok} msg_id={pinned_msg_id}")
                 if not ok:
-                    msg_id = send(CHANNEL, text)
-                    if msg_id:
-                        pinned_msg_id = msg_id
-                        pin_msg(CHANNEL, msg_id)
-                        save_pin_id(msg_id)
-                        print(f"Новый закреп: {msg_id}")
+                    pinned_msg_id = get_pinned_msg_id()
+                    if pinned_msg_id:
+                        edit_msg(CHANNEL, pinned_msg_id, text)
+                    else:
+                        msg_id = send(CHANNEL, text)
+                        if msg_id:
+                            pinned_msg_id = msg_id
+                            pin_msg(CHANNEL, msg_id)
             else:
                 msg_id = send(CHANNEL, text)
                 if msg_id:
                     pinned_msg_id = msg_id
                     pin_msg(CHANNEL, msg_id)
-                    save_pin_id(msg_id)
         except Exception as e:
             print("Ошибка курсов:", e)
         time.sleep(120)

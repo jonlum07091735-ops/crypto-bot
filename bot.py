@@ -658,6 +658,96 @@ def daily_scheduler():
                 print("Ошибка вечерних итогов:", e)
         time.sleep(60)
 
+def get_hashtags(title, category):
+    base = "#крипто #криптовалюта #crypto #bitcoin #биткоин #btc #трейдинг #криптоновости"
+    t = title.lower()
+    extra = ""
+    if "bitcoin" in t or "btc" in t:
+        extra = "#bitcoin #биткоин #btc #bitcoinnews"
+    elif "ethereum" in t or "eth" in t:
+        extra = "#ethereum #eth #эфириум"
+    elif "solana" in t or "sol" in t:
+        extra = "#solana #sol #соланa"
+    elif "xrp" in t or "ripple" in t:
+        extra = "#xrp #ripple #риппл"
+    elif "bnb" in t or "binance" in t:
+        extra = "#bnb #binance #байбит"
+    elif "nft" in t:
+        extra = "#nft #нфт #digitalart"
+    elif "defi" in t:
+        extra = "#defi #децентрализация #web3"
+    elif "oil" in t or "нефть" in t or "brent" in t:
+        extra = "#нефть #brent #сырьё #commodities"
+    if category == "bull":
+        extra += " #рост #bullmarket #лонг"
+    elif category == "bear":
+        extra += " #падение #bearmarket #шорт"
+    elif category == "analyst":
+        extra += " #аналитика #прогноз #анализрынка"
+    return f"\n\n{base} {extra}".strip()
+
+HASHTAGS = {
+    "base": ["#крипто", "#криптовалюта", "#crypto", "#bitcoin", "#биткоин", "#трейдинг", "#криптоновости"],
+    "bitcoin": ["#bitcoin", "#btc", "#биткоин", "#bitcoinnews"],
+    "ethereum": ["#ethereum", "#eth", "#эфириум"],
+    "bull": ["#рост", "#bullmarket", "#лонг", "#pump"],
+    "bear": ["#падение", "#bearmarket", "#шорт", "#dump"],
+    "analyst": ["#аналитика", "#прогноз", "#анализрынка"],
+    "oil": ["#нефть", "#brent", "#сырьё"],
+    "defi": ["#defi", "#web3", "#децентрализация"],
+    "nft": ["#nft", "#нфт", "#digitalart"],
+    "default": ["#altcoin", "#инвестиции", "#финансы", "#рынок"]
+}
+
+def update_hashtags():
+    while True:
+        try:
+            trending = []
+            r = requests.get(
+                "https://cryptopanic.com/api/v1/posts/?auth_token=public&kind=news&limit=20",
+                timeout=10
+            )
+            for item in r.json().get("results", [])[:20]:
+                title = item.get("title", "").lower()
+                words = title.split()
+                for word in words:
+                    if len(word) > 4 and word.isalpha():
+                        trending.append("#" + word)
+            if trending:
+                from collections import Counter
+                top = [tag for tag, _ in Counter(trending).most_common(5)]
+                HASHTAGS["trending"] = top
+                print(f"Хэштеги обновлены: {top}")
+        except Exception as e:
+            print("Ошибка обновления хэштегов:", e)
+        time.sleep(86400)
+
+def get_hashtags(title, category):
+    t = title.lower()
+    tags = list(HASHTAGS["base"])
+    if "bitcoin" in t or "btc" in t:
+        tags.extend(HASHTAGS["bitcoin"])
+    elif "ethereum" in t or "eth" in t:
+        tags.extend(HASHTAGS["ethereum"])
+    elif "oil" in t or "нефть" in t or "brent" in t:
+        tags.extend(HASHTAGS["oil"])
+    elif "nft" in t:
+        tags.extend(HASHTAGS["nft"])
+    elif "defi" in t:
+        tags.extend(HASHTAGS["defi"])
+    else:
+        tags.extend(HASHTAGS["default"])
+    if category == "bull":
+        tags.extend(HASHTAGS["bull"])
+    elif category == "bear":
+        tags.extend(HASHTAGS["bear"])
+    elif category == "analyst":
+        tags.extend(HASHTAGS["analyst"])
+    if "trending" in HASHTAGS:
+        tags.extend(HASHTAGS["trending"][:3])
+    unique = list(dict.fromkeys(tags))
+    return "\n\n" + " ".join(unique[:15])
+
 def write_post(title, source, article_text="", lang="en"):
     if article_text:
         content = f"Заголовок: {title}\nИсточник: {source}\n\nТекст:\n{article_text}"
@@ -706,7 +796,7 @@ def prepare_and_send(chat, item):
         {"text": "🔄 Переписать", "callback_data": "redo_" + pid},
         {"text": "🖼 Другое фото", "callback_data": "newimg_" + pid}
     ]]}
-    caption = f"📝 <b>Готовый пост:</b>\n\n{post}\n\n─────────────\nПубликовать в @cryptoainovosti?"
+    caption = f"📝 <b>Готовый пост:</b>\n\n{post}{get_hashtags(title, category)}\n\n─────────────\nПубликовать в @cryptoainovosti?"
     ok = send_photo(chat, img_url, caption, markup)
     if not ok:
         send(chat, caption, markup)
@@ -731,6 +821,34 @@ def assistant(chat, text):
     response = ai(messages)
     chat_history[chat].append({"role": "assistant", "content": response})
     send(chat, "🤖 " + response)
+
+def auto_publish():
+    time.sleep(60)
+    while True:
+        try:
+            news = fetch_all_news()
+            for item in news:
+                if item["id"] not in seen_news:
+                    seen_news.add(item["id"])
+                    title = item["title"]
+                    source = item["source"]
+                    url = item.get("url", "")
+                    lang = item.get("lang", "en")
+                    category = item.get("category", "neutral")
+                    article_text = fetch_article_text(url) if url else ""
+                    post = write_post(title, source, article_text, lang)
+                    hashtags = get_hashtags(title, category)
+                    img_url = get_image(title)
+                    full_post = post + hashtags
+                    ok = send_photo(CHANNEL, img_url, full_post)
+                    if not ok:
+                        send(CHANNEL, full_post)
+                    send(CHAT_ID, f"✅ Автопост опубликован:\n\n<i>{title}</i>")
+                    print(f"Автопост: {title}")
+                    break
+        except Exception as e:
+            print("Ошибка автопоста:", e)
+        time.sleep(10800)
 
 def monitor_news():
     while True:
@@ -878,6 +996,8 @@ def handle(msg):
 threading.Thread(target=rates_updater, daemon=True).start()
 threading.Thread(target=monitor_news, daemon=True).start()
 threading.Thread(target=daily_scheduler, daemon=True).start()
+threading.Thread(target=update_hashtags, daemon=True).start()
+threading.Thread(target=auto_publish, daemon=True).start()
 
 send(CHAT_ID,
     "✅ <b>Бот запущен!</b>\n"

@@ -281,6 +281,7 @@ def format_rates():
         a = arrow(c)
         sign = "+" if c >= 0 else ""
         lines.append(f"🛢 BRENT  ${p:.2f}  {a} {sign}{c:.1f}%")
+    lines.append("\n🔄 <i>Данные обновляются каждые 60 секунд</i>")
     return "\n".join(lines)
 
 def get_pinned_msg_id():

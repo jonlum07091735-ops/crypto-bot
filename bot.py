@@ -11,6 +11,7 @@ import xml.etree.ElementTree as ET
 TOKEN = os.environ.get("TELEGRAM_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 GROQ_KEY = os.environ.get("GROQ_API_KEY")
+MAGIC_KEY = os.environ.get("MAGIC_HOUR_KEY")
 API = "https://api.telegram.org/bot" + TOKEN
 CHANNEL = "@cryptoainovosti"
 
@@ -167,6 +168,80 @@ def edit_msg(chat, msg_id, text):
         return r.json().get("ok", False)
     except:
         return False
+
+def send_video(chat, video_url, caption=""):
+    try:
+        r = requests.post(API + "/sendVideo", json={
+            "chat_id": chat,
+            "video": video_url,
+            "caption": caption,
+            "parse_mode": "HTML"
+        }, timeout=30)
+        return r.json().get("ok", False)
+    except:
+        return False
+
+def generate_video(prompt):
+    try:
+        r = requests.post(
+            "https://api.magichour.ai/api/v1/ai-video-clip/create",
+            headers={
+                "Authorization": "Bearer " + MAGIC_KEY,
+                "Content-Type": "application/json"
+            },
+            json={
+                "name": "crypto_reel",
+                "prompt": prompt,
+                "style": "cinematic",
+                "duration": 5,
+                "aspect_ratio": "9:16"
+            },
+            timeout=30
+        )
+        data = r.json()
+        job_id = data.get("id")
+        if not job_id:
+            return None
+        for _ in range(30):
+            time.sleep(10)
+            r2 = requests.get(
+                f"https://api.magichour.ai/api/v1/ai-video-clip/{job_id}",
+                headers={"Authorization": "Bearer " + MAGIC_KEY},
+                timeout=10
+            )
+            result = r2.json()
+            status = result.get("status")
+            if status == "complete":
+                return result.get("download_url")
+            elif status == "failed":
+                return None
+        return None
+    except Exception as e:
+        print("Ошибка генерации видео:", e)
+        return None
+
+def auto_video():
+    time.sleep(120)
+    while True:
+        try:
+            news = fetch_all_news()
+            for item in news:
+                if item["id"] not in seen_news:
+                    title = item["title"]
+                    category = item.get("category", "neutral")
+                    hashtags = get_hashtags(title, category)
+                    prompt = f"Cinematic crypto finance video. {title}. Professional financial news style, dark background, bitcoin and charts, 4K quality"
+                    send(CHAT_ID, f"🎬 Генерирую видео:\n<i>{title}</i>")
+                    video_url = generate_video(prompt)
+                    if video_url:
+                        caption = f"🎬 {title}\n\n@cryptoainovosti{hashtags}"
+                        ok = send_video(CHANNEL, video_url, caption)
+                        if ok:
+                            send(CHAT_ID, "✅ Видео опубликовано в канал!")
+                    break
+        except Exception as e:
+            print("Ошибка автовидео:", e)
+        time.sleep(21600)
 
 def pin_msg(chat, msg_id):
     try:
@@ -984,6 +1059,24 @@ def handle(msg):
             priority = "🔴" if n["score"] >= 3 else "🟡"
             msg2 += f"{priority}{icon}{flag} {n['title']}\n📌 {n['source']}\n\n"
         send(chat, msg2)
+    elif text == "/video":
+        send(chat, "🎬 Генерирую видео по свежей новости...")
+        news = fetch_all_news()
+        if news:
+            item = news[0]
+            title = item["title"]
+            category = item.get("category", "neutral")
+            hashtags = get_hashtags(title, category)
+            prompt = f"Cinematic crypto finance video. {title}. Professional financial news, dark background, bitcoin charts, 4K"
+            video_url = generate_video(prompt)
+            if video_url:
+                caption = f"🎬 {title}\n\n@cryptoainovosti{hashtags}"
+                send_video(CHANNEL, video_url, caption)
+                send(chat, "✅ Видео опубликовано!")
+            else:
+                send(chat, "❌ Не удалось сгенерировать видео")
+        else:
+            send(chat, "❌ Новостей не найдено")
     elif text == "/rates":
         text_rates = format_rates()
         markup = {"inline_keyboard": [[
@@ -998,6 +1091,7 @@ threading.Thread(target=monitor_news, daemon=True).start()
 threading.Thread(target=daily_scheduler, daemon=True).start()
 threading.Thread(target=update_hashtags, daemon=True).start()
 threading.Thread(target=auto_publish, daemon=True).start()
+threading.Thread(target=auto_video, daemon=True).start()
 
 send(CHAT_ID,
     "✅ <b>Бот запущен!</b>\n"

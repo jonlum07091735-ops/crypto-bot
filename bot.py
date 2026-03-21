@@ -184,27 +184,17 @@ def send_video(chat, video_url, caption=""):
 def generate_video(prompt):
     try:
         r = requests.post(
-            "https://api.magichour.ai/v1/animation",
+            "https://api.magichour.ai/v1/text-to-video",
             headers={
                 "Authorization": "Bearer " + MAGIC_KEY,
                 "Content-Type": "application/json"
             },
             json={
                 "name": "crypto_news",
-                "fps": 12,
                 "end_seconds": 5,
-                "height": 960,
-                "width": 512,
-                "style": {
-                    "art_style": "Cinematic",
-                    "prompt_type": "custom",
-                    "prompt": prompt,
-                    "camera_effect": "Simple Zoom Out",
-                    "transition_speed": 3
-                },
-                "assets": {
-                    "audio_source": "none"
-                }
+                "orientation": "portrait",
+                "resolution": "720p",
+                "style": {"prompt": prompt}
             },
             timeout=30
         )
@@ -212,11 +202,12 @@ def generate_video(prompt):
         print("Magic Hour response:", data)
         job_id = data.get("id")
         if not job_id:
+            print("No job_id:", data)
             return None
         for _ in range(30):
             time.sleep(10)
             r2 = requests.get(
-                f"https://api.magichour.ai/v1/animation/{job_id}",
+                f"https://api.magichour.ai/v1/text-to-video/{job_id}",
                 headers={"Authorization": "Bearer " + MAGIC_KEY},
                 timeout=10
             )
@@ -227,7 +218,7 @@ def generate_video(prompt):
                 downloads = result.get("downloads", [])
                 if downloads:
                     return downloads[0].get("url")
-                return result.get("download_url")
+                return None
             elif status in ["error", "canceled"]:
                 return None
         return None

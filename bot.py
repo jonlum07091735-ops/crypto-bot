@@ -184,36 +184,51 @@ def send_video(chat, video_url, caption=""):
 def generate_video(prompt):
     try:
         r = requests.post(
-            "https://api.magichour.ai/api/v1/ai-video-clip/create",
+            "https://api.magichour.ai/v1/animation",
             headers={
                 "Authorization": "Bearer " + MAGIC_KEY,
                 "Content-Type": "application/json"
             },
             json={
-                "name": "crypto_reel",
-                "prompt": prompt,
-                "style": "cinematic",
-                "duration": 5,
-                "aspect_ratio": "9:16"
+                "name": "crypto_news",
+                "fps": 12,
+                "end_seconds": 5,
+                "height": 960,
+                "width": 512,
+                "style": {
+                    "art_style": "Cinematic",
+                    "prompt_type": "custom",
+                    "prompt": prompt,
+                    "camera_effect": "Simple Zoom Out",
+                    "transition_speed": 3
+                },
+                "assets": {
+                    "audio_source": "none"
+                }
             },
             timeout=30
         )
         data = r.json()
+        print("Magic Hour response:", data)
         job_id = data.get("id")
         if not job_id:
             return None
         for _ in range(30):
             time.sleep(10)
             r2 = requests.get(
-                f"https://api.magichour.ai/api/v1/ai-video-clip/{job_id}",
+                f"https://api.magichour.ai/v1/animation/{job_id}",
                 headers={"Authorization": "Bearer " + MAGIC_KEY},
                 timeout=10
             )
             result = r2.json()
             status = result.get("status")
+            print(f"Video status: {status}")
             if status == "complete":
+                downloads = result.get("downloads", [])
+                if downloads:
+                    return downloads[0].get("url")
                 return result.get("download_url")
-            elif status == "failed":
+            elif status in ["error", "canceled"]:
                 return None
         return None
     except Exception as e:

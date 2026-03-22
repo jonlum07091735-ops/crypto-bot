@@ -75,71 +75,54 @@ def edit_msg(chat, msg_id, text):
     except:
         return False
 
-def send_video(chat, video_url, caption=""):
+def get_gif(title):
     try:
-        r = requests.post(API + "/sendVideo", json={
+        t = title.lower()
+        if "bitcoin" in t or "btc" in t:
+            query = "bitcoin crypto"
+        elif "ethereum" in t or "eth" in t:
+            query = "ethereum crypto"
+        elif "crash" in t or "drop" in t or "bear" in t:
+            query = "stock market crash"
+        elif "rally" in t or "surge" in t or "bull" in t:
+            query = "bull market money"
+        elif "oil" in t or "brent" in t:
+            query = "oil energy"
+        else:
+            query = "cryptocurrency blockchain"
+        r = requests.get(
+            "https://api.giphy.com/v1/gifs/search",
+            params={
+                "api_key": "dc6zaTOxFJmzC",
+                "q": query,
+                "limit": 20,
+                "rating": "g"
+            },
+            timeout=10
+        )
+        gifs = r.json().get("data", [])
+        if gifs:
+            gif = random.choice(gifs)
+            return gif["images"]["original"]["url"]
+        return None
+    except Exception as e:
+        print("Ошибка GIF:", e)
+        return None
+
+def send_animation(chat, gif_url, caption=""):
+    try:
+        r = requests.post(API + "/sendAnimation", json={
             "chat_id": chat,
-            "video": video_url,
+            "animation": gif_url,
             "caption": caption,
             "parse_mode": "HTML"
-        }, timeout=30)
+        }, timeout=15)
         return r.json().get("ok", False)
     except:
         return False
 
-def generate_video(title, img_url):
-    try:
-        r = requests.post(
-            "https://api.magichour.ai/v1/image-to-video",
-            headers={
-                "Authorization": "Bearer " + MAGIC_KEY,
-                "Content-Type": "application/json"
-            },
-            json={
-                "name": "crypto_news",
-                "end_seconds": 3,
-                "height": 960,
-                "width": 512,
-                "style": {
-                    "prompt": f"Cinematic crypto finance video. {title[:100]}. Dark background, charts, professional news style.",
-                    "camera_effect": "Simple Zoom Out"
-                },
-                "assets": {
-                    "image_file_path": img_url
-                }
-            },
-            timeout=30
-        )
-        data = r.json()
-        print("Magic Hour response:", data)
-        job_id = data.get("id")
-        if not job_id:
-            print("No job_id:", data)
-            return None
-        for _ in range(30):
-            time.sleep(10)
-            r2 = requests.get(
-                f"https://api.magichour.ai/v1/image-to-video/{job_id}",
-                headers={"Authorization": "Bearer " + MAGIC_KEY},
-                timeout=10
-            )
-            result = r2.json()
-            status = result.get("status")
-            print(f"Video status: {status}")
-            if status == "complete":
-                downloads = result.get("downloads", [])
-                if downloads:
-                    return downloads[0].get("url")
-                return None
-            elif status in ["error", "canceled"]:
-                return None
-        return None
-    except Exception as e:
-        print("Ошибка генерации видео:", e)
-        return None
-
-def auto_video():
-    time.sleep(120)
+def auto_gif():
+    time.sleep(180)
     while True:
         try:
             news = fetch_all_news()
@@ -148,18 +131,16 @@ def auto_video():
                     title = item["title"]
                     category = item.get("category", "neutral")
                     hashtags = get_hashtags(title, category)
-                    img_url = get_image(title)
-                    send(CHAT_ID, f"🎬 Генерирую видео:\n<i>{title}</i>")
-                    video_url = generate_video(title, img_url)
-                    if video_url:
-                        caption = f"🎬 {title}\n\n@cryptoainovosti{hashtags}"
-                        ok = send_video(CHANNEL, video_url, caption)
+                    gif_url = get_gif(title)
+                    if gif_url:
+                        caption = f"🎬 <b>{title[:150]}</b>\n\n@cryptoainovosti{hashtags}"
+                        ok = send_animation(CHANNEL, gif_url, caption)
                         if ok:
-                            send(CHAT_ID, "✅ Видео опубликовано в канал!")
+                            send(CHAT_ID, f"✅ GIF опубликован:\n<i>{title}</i>")
                     break
         except Exception as e:
-            print("Ошибка автовидео:", e)
-        time.sleep(21600)
+            print("Ошибка авто-GIF:", e)
+        time.sleep(10800)
 
 def pin_msg(chat, msg_id):
     try:
@@ -897,6 +878,23 @@ def handle_callback(cb):
         ok = send_photo(chat, img_url, caption, markup)
         if not ok:
             send(chat, caption, markup)
+    elif data == "pub_gif":
+        send(chat, "🔍 Ищу GIF...")
+        news = fetch_all_news()
+        if news:
+            item = news[0]
+            title = item["title"]
+            category = item.get("category", "neutral")
+            hashtags = get_hashtags(title, category)
+            gif_url = get_gif(title)
+            if gif_url:
+                caption = f"🎬 <b>{title[:150]}</b>\n\n@cryptoainovosti{hashtags}"
+                send_animation(CHANNEL, gif_url, caption)
+                send(chat, "✅ GIF опубликован в канал!")
+            else:
+                send(chat, "❌ GIF не найден")
+        else:
+            send(chat, "❌ Новостей не найдено")
     elif data == "update_rates":
         text_rates = format_rates()
         if pinned_msg_id:
@@ -977,24 +975,11 @@ def handle(msg):
             priority = "🔴" if n["score"] >= 3 else "🟡"
             msg2 += f"{priority}{icon}{flag} {n['title']}\n📌 {n['source']}\n\n"
         send(chat, msg2)
-    elif text == "/video":
-        send(chat, "🎬 Генерирую видео по свежей новости...")
-        news = fetch_all_news()
-        if news:
-            item = news[0]
-            title = item["title"]
-            category = item.get("category", "neutral")
-            hashtags = get_hashtags(title, category)
-            img_url = get_image(title)
-            video_url = generate_video(title, img_url)
-            if video_url:
-                caption = f"🎬 {title}\n\n@cryptoainovosti{hashtags}"
-                send_video(CHANNEL, video_url, caption)
-                send(chat, "✅ Видео опубликовано!")
-            else:
-                send(chat, "❌ Не удалось сгенерировать видео")
-        else:
-            send(chat, "❌ Новостей не найдено")
+    elif text == "/gif":
+        markup = {"inline_keyboard": [[
+            {"text": "🎬 Опубликовать GIF в канал", "callback_data": "pub_gif"}
+        ]]}
+        send(chat, "🎬 Нажми кнопку чтобы опубликовать GIF по свежей новости!", markup)
     elif text == "/rates":
         text_rates = format_rates()
         markup = {"inline_keyboard": [[
@@ -1009,7 +994,7 @@ threading.Thread(target=monitor_news, daemon=True).start()
 threading.Thread(target=daily_scheduler, daemon=True).start()
 threading.Thread(target=update_hashtags, daemon=True).start()
 threading.Thread(target=auto_publish, daemon=True).start()
-threading.Thread(target=auto_video, daemon=True).start()
+threading.Thread(target=auto_gif, daemon=True).start()
 
 send(CHAT_ID,
     "✅ <b>Бот запущен!</b>\n"

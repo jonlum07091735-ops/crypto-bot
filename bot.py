@@ -21,133 +21,39 @@ chat_history = {}
 seen_news = set()
 pinned_msg_id = None
 
-# Тематические фото по категориям — реальные Unsplash фото по конкретным темам
-THEMED_PHOTOS = {
-    "bitcoin": [
-        "https://images.unsplash.com/photo-1518544801976-3e159e50e5bb?w=1024&q=80",
-        "https://images.unsplash.com/photo-1561622539-a6fe1b7e3ab6?w=1024&q=80",
-        "https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=1024&q=80",
-        "https://images.unsplash.com/photo-1591994843349-f415893b3a6b?w=1024&q=80",
-        "https://images.unsplash.com/photo-1629339942248-45d4b10c8c2f?w=1024&q=80",
-        "https://images.unsplash.com/photo-1609554496796-c345a5335ceb?w=1024&q=80",
-        "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1024&q=80",
-        "https://images.unsplash.com/photo-1640340434855-6084b1f4901c?w=1024&q=80",
-    ],
-    "ethereum": [
-        "https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=1024&q=80",
-        "https://images.unsplash.com/photo-1622630998477-20aa696ecb05?w=1024&q=80",
-        "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=1024&q=80",
-        "https://images.unsplash.com/photo-1643101681604-f98a4b57b9f3?w=1024&q=80",
-        "https://images.unsplash.com/photo-1644143379190-08a5f055de1d?w=1024&q=80",
-        "https://images.unsplash.com/photo-1645731904636-24bb2c4b1e5f?w=1024&q=80",
-    ],
-    "trading": [
-        "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1024&q=80",
-        "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1024&q=80",
-        "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1024&q=80",
-        "https://images.unsplash.com/photo-1535320903710-d993d3d77d29?w=1024&q=80",
-        "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1024&q=80",
-        "https://images.unsplash.com/photo-1563986768494-4dee2763ff3f?w=1024&q=80",
-        "https://images.unsplash.com/photo-1569025743873-ea3a9ade89f9?w=1024&q=80",
-        "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=1024&q=80",
-    ],
-    "bull": [
-        "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1024&q=80",
-        "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=1024&q=80",
-        "https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=1024&q=80",
-        "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1024&q=80",
-        "https://images.unsplash.com/photo-1642790106117-e829e14a795f?w=1024&q=80",
-        "https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?w=1024&q=80",
-    ],
-    "bear": [
-        "https://images.unsplash.com/photo-1535320903710-d993d3d77d29?w=1024&q=80",
-        "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1024&q=80",
-        "https://images.unsplash.com/photo-1607863680198-23d4b2565df0?w=1024&q=80",
-        "https://images.unsplash.com/photo-1508514177221-188b1cf16e9d?w=1024&q=80",
-        "https://images.unsplash.com/photo-1574607383476-f517f260d30b?w=1024&q=80",
-    ],
-    "oil": [
-        "https://images.unsplash.com/photo-1498354178607-a79df2916198?w=1024&q=80",
-        "https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=1024&q=80",
-        "https://images.unsplash.com/photo-1611270629569-8b357cb88da9?w=1024&q=80",
-        "https://images.unsplash.com/photo-1535637603896-07c179d71103?w=1024&q=80",
-        "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=1024&q=80",
-    ],
-    "regulation": [
-        "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1024&q=80",
-        "https://images.unsplash.com/photo-1554469384-e58fac16e23a?w=1024&q=80",
-        "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1024&q=80",
-        "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1024&q=80",
-    ],
-    "defi": [
-        "https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=1024&q=80",
-        "https://images.unsplash.com/photo-1644143379190-08a5f055de1d?w=1024&q=80",
-        "https://images.unsplash.com/photo-1523961131990-5ea7c61b2107?w=1024&q=80",
-        "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=1024&q=80",
-    ],
-    "nft": [
-        "https://images.unsplash.com/photo-1645378999496-33700b60e62d?w=1024&q=80",
-        "https://images.unsplash.com/photo-1646803194571-e8e2a1c8e21d?w=1024&q=80",
-        "https://images.unsplash.com/photo-1647427060118-4911c9821b82?w=1024&q=80",
-        "https://images.unsplash.com/photo-1648318513261-c37ea6e7b8aa?w=1024&q=80",
-    ],
-    "analyst": [
-        "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1024&q=80",
-        "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1024&q=80",
-        "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1024&q=80",
-        "https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=1024&q=80",
-        "https://images.unsplash.com/photo-1563986768494-4dee2763ff3f?w=1024&q=80",
-    ],
-    "default": [
-        "https://images.unsplash.com/photo-1605792657660-596af9009e82?w=1024&q=80",
-        "https://images.unsplash.com/photo-1592483648228-b35146a4330c?w=1024&q=80",
-        "https://images.unsplash.com/photo-1630926854574-977b8e04c58c?w=1024&q=80",
-        "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?w=1024&q=80",
-        "https://images.unsplash.com/photo-1523961131990-5ea7c61b2107?w=1024&q=80",
-        "https://images.unsplash.com/photo-1569025743873-ea3a9ade89f9?w=1024&q=80",
-        "https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=1024&q=80",
-        "https://images.unsplash.com/photo-1607863680198-23d4b2565df0?w=1024&q=80",
-        "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=1024&q=80",
-        "https://images.unsplash.com/photo-1620321023374-d1a68fbc720d?w=1024&q=80",
-    ]
-}
-
-used_photos = {}
-
 def get_image(title):
     t = title.lower()
     if "bitcoin" in t or "btc" in t:
-        category = "bitcoin"
+        query = "bitcoin cryptocurrency"
     elif "ethereum" in t or "eth" in t:
-        category = "ethereum"
-    elif "oil" in t or "нефть" in t or "brent" in t or "crude" in t:
-        category = "oil"
+        query = "ethereum blockchain"
+    elif "oil" in t or "нефть" in t or "brent" in t:
+        query = "oil petroleum energy"
     elif "nft" in t:
-        category = "nft"
-    elif "defi" in t or "decentralized" in t:
-        category = "defi"
-    elif "regulation" in t or "sec" in t or "ban" in t or "law" in t or "регул" in t:
-        category = "regulation"
-    elif "crash" in t or "drop" in t or "bear" in t or "падение" in t or "обвал" in t:
-        category = "bear"
-    elif "rally" in t or "surge" in t or "bull" in t or "ath" in t or "рост" in t:
-        category = "bull"
-    elif "analyst" in t or "forecast" in t or "аналитик" in t or "прогноз" in t:
-        category = "analyst"
-    elif "trading" in t or "trade" in t:
-        category = "trading"
+        query = "nft digital art"
+    elif "defi" in t:
+        query = "defi blockchain finance"
+    elif "regulation" in t or "sec" in t or "ban" in t:
+        query = "law regulation finance"
+    elif "crash" in t or "drop" in t or "bear" in t:
+        query = "stock market crash finance"
+    elif "rally" in t or "surge" in t or "bull" in t:
+        query = "stock market growth bull"
+    elif "analyst" in t or "forecast" in t:
+        query = "financial analyst charts"
+    elif "trading" in t:
+        query = "trading charts finance"
+    elif "solana" in t or "sol" in t:
+        query = "solana crypto blockchain"
+    elif "xrp" in t or "ripple" in t:
+        query = "ripple xrp crypto"
+    elif "bnb" in t or "binance" in t:
+        query = "binance exchange crypto"
     else:
-        category = "default"
-    pool = THEMED_PHOTOS[category]
-    if category not in used_photos:
-        used_photos[category] = []
-    available = [p for p in pool if p not in used_photos[category]]
-    if not available:
-        used_photos[category] = []
-        available = pool
-    img = random.choice(available)
-    used_photos[category].append(img)
-    return img
+        query = "cryptocurrency blockchain finance"
+    seed = random.randint(1, 99999)
+    encoded = requests.utils.quote(query)
+    return f"https://source.unsplash.com/1024x512/?{encoded}&sig={seed}"
 
 def send(chat, text, markup=None):
     data = {"chat_id": chat, "text": text, "parse_mode": "HTML"}
@@ -181,20 +87,26 @@ def send_video(chat, video_url, caption=""):
     except:
         return False
 
-def generate_video(prompt):
+def generate_video(title, img_url):
     try:
         r = requests.post(
-            "https://api.magichour.ai/v1/text-to-video",
+            "https://api.magichour.ai/v1/image-to-video",
             headers={
                 "Authorization": "Bearer " + MAGIC_KEY,
                 "Content-Type": "application/json"
             },
             json={
                 "name": "crypto_news",
-                "end_seconds": 5,
-                "orientation": "portrait",
-                "resolution": "720p",
-                "style": {"prompt": prompt}
+                "end_seconds": 3,
+                "height": 960,
+                "width": 512,
+                "style": {
+                    "prompt": f"Cinematic crypto finance video. {title[:100]}. Dark background, charts, professional news style.",
+                    "camera_effect": "Simple Zoom Out"
+                },
+                "assets": {
+                    "image_file_path": img_url
+                }
             },
             timeout=30
         )
@@ -207,7 +119,7 @@ def generate_video(prompt):
         for _ in range(30):
             time.sleep(10)
             r2 = requests.get(
-                f"https://api.magichour.ai/v1/text-to-video/{job_id}",
+                f"https://api.magichour.ai/v1/image-to-video/{job_id}",
                 headers={"Authorization": "Bearer " + MAGIC_KEY},
                 timeout=10
             )
@@ -236,9 +148,9 @@ def auto_video():
                     title = item["title"]
                     category = item.get("category", "neutral")
                     hashtags = get_hashtags(title, category)
-                    prompt = f"Cinematic crypto finance video. {title}. Professional financial news style, dark background, bitcoin and charts, 4K quality"
+                    img_url = get_image(title)
                     send(CHAT_ID, f"🎬 Генерирую видео:\n<i>{title}</i>")
-                    video_url = generate_video(prompt)
+                    video_url = generate_video(title, img_url)
                     if video_url:
                         caption = f"🎬 {title}\n\n@cryptoainovosti{hashtags}"
                         ok = send_video(CHANNEL, video_url, caption)
@@ -1073,8 +985,8 @@ def handle(msg):
             title = item["title"]
             category = item.get("category", "neutral")
             hashtags = get_hashtags(title, category)
-            prompt = f"Cinematic crypto finance video. {title}. Professional financial news, dark background, bitcoin charts, 4K"
-            video_url = generate_video(prompt)
+            img_url = get_image(title)
+            video_url = generate_video(title, img_url)
             if video_url:
                 caption = f"🎬 {title}\n\n@cryptoainovosti{hashtags}"
                 send_video(CHANNEL, video_url, caption)

@@ -994,7 +994,6 @@ threading.Thread(target=monitor_news, daemon=True).start()
 threading.Thread(target=daily_scheduler, daemon=True).start()
 threading.Thread(target=update_hashtags, daemon=True).start()
 threading.Thread(target=auto_publish, daemon=True).start()
-threading.Thread(target=auto_gif, daemon=True).start()
 
 send(CHAT_ID,
     "✅ <b>Бот запущен!</b>\n"
